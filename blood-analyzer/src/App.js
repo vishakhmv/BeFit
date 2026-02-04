@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import "./App.css";
 
 function App() {
@@ -23,7 +24,7 @@ function App() {
 
           <div className="buttons">
             <button className="signup">Sign up</button>
-            <button className="login">Log in</button>
+            <Link to="/login" className="login">Log in</Link>
           </div>
         </div>
 
