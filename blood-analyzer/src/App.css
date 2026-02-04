@@ -6,7 +6,7 @@
 }
 
 .container {
-  background: white;
+  background: whitesmoke;
 }
 
 .navbar {
@@ -86,9 +86,10 @@
   background: white;
   color: #2c5f63;
   border: 2px solid #2c5f63;
-  padding: 10px 32px;
+  padding: 11px 36px;
   border-radius: 20px;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .hero-image{
@@ -99,4 +100,9 @@
   height: calc(100vh - 11.5vh);
   width: 100%;
   padding: 1%;
+  object-fit: cover;
+}
+
+@media (max-width: 768px) {
+  
 }

@@ -24,7 +24,7 @@ function Login() {
       </div>
 
       <div className="login-right">
-        <img src="/heroimage.jfif" alt="Health" />
+        <img src="/loginheroimage.jpg" alt="Health" />
       </div>
     </div>
   );
