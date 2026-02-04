@@ -6,7 +6,6 @@
 }
 
 .container {
-  min-height: 100vh;
   background: white;
 }
 
@@ -15,8 +14,9 @@
   justify-content: space-between;
   align-items: center;
   padding: 24px 48px;
-  height: 10vh;
+  height: 11vh;
   border-bottom: 1.5px solid #2c5f63;
+  padding: 27px;
 }
 
 .logo {
@@ -37,50 +37,62 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 27px 24px;
+  /* padding: 27px 24px; */
 }
 
 .hero-text {
-  max-width: 500px;
+  width: 45%;
+  margin-left: 1.2rem;
 }
 
 .hero-text h2 {
-  font-size: 42px;
+  font-size: 4rem;
   margin-bottom: 20px;
+  margin-top: -3rem;
 }
 
 .hero-text p {
   color: #555;
   margin-bottom: 32px;
+  font-size: 1.5rem;
 }
 
 .buttons {
   display: flex;
-  gap: 16px;
+  gap: 1.5rem;
 }
 
 .signup {
   font-weight: 600;
+  font-size: 1.2rem;
   background: #2c5f63;
   color: white;
   border: none;
   padding: 10px 22px;
   border-radius: 20px;
   cursor: pointer;
+  height: 3rem;
+  width: 8rem;
 }
 
 .login {
   font-weight: 600;
+  font-size: 1.2rem;
+  height: 3rem;
+  width: 8rem;
   background: white;
   color: #2c5f63;
-  border: 1px solid #2c5f63;
+  border: 2px solid #2c5f63;
   padding: 10px 22px;
   border-radius: 20px;
   cursor: pointer;
 }
 
+.hero-image{
+  width: 55%;
+}
+
 .hero-image img {
-  height: 81vh;
-  width: 820px;
-  border-radius: 6px;
+  height: calc(100vh - 11.5vh);
+  width: 100%;
 }
