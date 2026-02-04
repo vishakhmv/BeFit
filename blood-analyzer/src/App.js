@@ -10,7 +10,6 @@ function App() {
           <a href="#">Help & Support</a>
         </div>
       </nav>
-      <hr></hr>
 
       <section className="hero">
         <div className="hero-text">
