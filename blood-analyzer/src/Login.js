@@ -2,17 +2,24 @@ import "./Login.css";
 
 function Login() {
   return (
+    <>
+    <nav className="navbar">
+        <h1 className="logo">BeFit</h1>
+          <div className="nav-links">
+          <a href="#">About us</a>
+          <a href="#">Help & Support</a>
+        </div>
+
+    </nav>
     <div className="login-container">
       <div className="login-left">
-        <h1 className="logo">BeFit</h1>
-
-        <h2>Welcome back</h2>
+        <h2>Welcome back...</h2>
         <p className="subtitle">
           Enter your details to access your health data.
         </p>
 
-        <input type="email" placeholder="Email" />
-        <input type="password" placeholder="Password" />
+        <input type="email" placeholder="Email" maxLength={32} />
+        <input type="password" placeholder="Password" maxLength={32}/>
 
         <a href="#" className="forgot">Forgot password?</a>
 
@@ -27,6 +34,7 @@ function Login() {
         <img src="/loginheroimage.jpg" alt="Health" />
       </div>
     </div>
+    </>
   );
 }
 
