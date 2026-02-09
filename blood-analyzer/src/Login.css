@@ -1,0 +1,21 @@
+*{
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+.login-container{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 100vh;
+    padding: 2%;
+}
+
+.login-form{
+    max-width:40%;
+}
+
+.login-img{
+    max-width: 60%;
+}
