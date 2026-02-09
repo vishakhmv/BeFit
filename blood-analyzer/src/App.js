@@ -1,7 +1,8 @@
-import { Link } from "react-router-dom";
+import { useState } from "react";
 import "./App.css";
 
 function App() {
+  const [Login , setLogin] = useState(false);
   return (
     <div className="container">
       <nav className="navbar">
@@ -12,8 +13,8 @@ function App() {
         </div>
       </nav>
 
-      <section className="hero">
-        <div className="hero-text">
+       <section className={`hero ${Login ? "slide-left" : ""}`}>
+        <div className={`hero-text ${Login ? "hide" : ""}`}>
           <h2>
             Master Your Health <br /> with Smart Data.
           </h2>
@@ -24,12 +25,27 @@ function App() {
 
           <div className="buttons">
             <button className="signup">Sign up</button>
-            <Link to="/login" className="login">Log in</Link>
+            <button className="login" onClick={() => setLogin(true)}>
+              Log in
+            </button>
           </div>
         </div>
 
+        <div className={`login-hero-text ${Login ? "show" : ""}`}>
+          <h2>Welcome back...</h2>
+          <p>Enter your details to access your health data.</p>
+
+          <input type="email" placeholder="Email" />
+          <input type="password" placeholder="Password" />
+
+          <button className="login-btn">Log in</button>
+        </div>
+
         <div className="hero-image">
-          <img src="/heroimage.jpg" alt="Health" />
+          <img
+            src={Login ? "/loginheroimage.jpg" : "/heroimage.jpg"}
+            alt="Health"
+          />
         </div>
       </section>
     </div>
