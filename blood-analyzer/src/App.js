@@ -8,8 +8,14 @@ export default function App() {
 
   const goToLogin = () => {
     setExiting(true);
-    setTimeout(() => navigate("/login"), 500); // 0.5s
+    setTimeout(() => navigate("/login"), 750);
   };
+
+  const goToSignup = () => {
+    setExiting(true);
+    setTimeout(() => navigate("/signup"), 750);
+  };
+
 
   return (
     <>

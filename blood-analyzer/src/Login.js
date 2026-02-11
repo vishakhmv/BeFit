@@ -8,7 +8,8 @@ export default function Login() {
     </nav>
     <div className="login-container">
       <div className="login-form">
-        <h2>Welcome back</h2>
+        <h2>Welcome back...</h2>
+        <p>Enter your details below</p>
         <input placeholder="Email"/>
         <input placeholder="Password"/>
         <button>Log in</button>

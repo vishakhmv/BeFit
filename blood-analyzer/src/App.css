@@ -80,8 +80,16 @@
   white-space: nowrap;
 }
 
+.login:hover {
+    background-color: #443ef4;
+    color: whitesmoke;
+    border: none;
+}
+
 .hero-image{
-  width: 60%;
+  padding-top: .5%;
+  max-width: 60%;
+  margin-right: 3%;
 }
 
 .hero-image img {
@@ -94,7 +102,7 @@
 .container {
   min-height: 100vh;
   background: whitesmoke;
-  transition: transform 0.5s ease, opacity 0.5s ease;
+  transition: transform 0.5s ease, opacity .75s ease;
 }
 
 .container.exit {
