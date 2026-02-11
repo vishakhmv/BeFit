@@ -70,7 +70,7 @@
 .signup {
   background: #2c5f63;
   color: white;
-  border: none;
+  border: 2px solid;
 }
 
 .login {
@@ -80,32 +80,40 @@
   white-space: nowrap;
 }
 
+.signup:hover {
+  background-color: white;
+  color: black;
+  border: 2px solid black;
+}
+
 .login:hover {
     background-color: #443ef4;
     color: whitesmoke;
-    border: none;
+    border: 2px solid white;
 }
 
 .hero-image{
   padding-top: .5%;
   max-width: 60%;
-  margin-right: 3%;
+  display: flex;
+  justify-content: flex-end;
+  margin-right: 5%;
 }
 
 .hero-image img {
-  height: calc(100vh - 11.5vh);
+  height: calc(100vh - 13vh);
   width: 100%;
   padding: 1%;
   object-fit: cover;
 }
 
 .container {
-  min-height: 100vh;
+  min-height: calc(100vh - 10vh);
   background: whitesmoke;
-  transition: transform 0.5s ease, opacity .75s ease;
+  transition: transform 0.5s ease, opacity .25s ease;
 }
 
 .container.exit {
-  transform: translateX(-80px);
+  transform: translateX(-100%);
   opacity: 0;
 }

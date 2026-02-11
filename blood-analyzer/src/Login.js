@@ -12,7 +12,7 @@ export default function Login() {
         <p>Enter your details below</p>
         <input placeholder="Email"/>
         <input placeholder="Password"/>
-        <button>Log in</button>
+        <button className="final-login">Log in</button>
       </div>
       <div className="login-img">
         <img src="/loginheroimage.jpg" alt="Login" />
