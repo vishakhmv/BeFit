@@ -14,8 +14,8 @@ export default function Login() {
         <input placeholder="Password"/>
         <button className="final-login">Log in</button>
       </div>
-      <div className="login-img">
-        <img src="/loginheroimage.jpg" alt="Login" />
+      <div className="hero-image">
+        <img src="/heroimage.jpg" alt="Health" />
       </div>
     </div>
     </>

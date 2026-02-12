@@ -16,20 +16,17 @@ export default function App() {
     setTimeout(() => navigate("/signup"), 750);
   };
 
-
   return (
     <>
     <nav className="navbar">
       <h1 className="logo">BeFit</h1>
     </nav>
-    <div className={`container ${exiting ? "exit" : ""}`}>
       <section className="hero">
-        <div className="hero-text">
+        <div className={`hero-text ${exiting ? "exit" : ""}`}>
           <h2>Master Your Health <br /> with Smart Data.</h2>
           <p>Turn your blood reports into actionable insights and better
             habits for a healthier life.</p>
-
-          <button className="signup">
+          <button className="signup" onClick={goToSignup}>
             Sign up
           </button>
           <button className="login" onClick={goToLogin}>
@@ -41,7 +38,6 @@ export default function App() {
           <img src="/heroimage.jpg" alt="Health" />
         </div>
       </section>
-    </div>
     </>
   );
 }
