@@ -16,11 +16,12 @@
 }
 
 .login-form {
-    max-width: 450px;
+    max-width: 520px;
     width: 40%;
+    margin-left: 1.5rem;
     display: flex;
     flex-direction: column;
-    padding-left: 3%;
+    padding: 3%;
     gap: 1.3rem;
 }
 
@@ -28,9 +29,8 @@
     font-size: 3rem;
     color: #333;
     margin-bottom: 0.5rem;
-    font-size: clamp(2rem, 4vw, 3rem);
+  font-size: clamp(1.8rem, 4vw, 3rem);
     word-wrap: break-word;
-    overflow-wrap: break-word;
 }
 
 p{

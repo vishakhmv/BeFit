@@ -41,7 +41,8 @@
 }
 
 .hero-text {
-  max-width: 40%;
+  width: 40%;
+  max-width: 520px;
   margin-left: 1.5rem;
   transition: transform 0.5s ease, opacity .25s ease;
 }
@@ -55,6 +56,7 @@
   font-size: clamp(1.8rem, 4vw, 3rem);
   margin-bottom: 20px;
   word-wrap: break-word;
+  color: #333;
 }
 
 .hero-text p {
@@ -120,4 +122,21 @@ img {
   max-width: 800px;
   border-radius: 20px;
   object-fit: cover;
+}
+
+@media (max-width: 768px) {
+  .hero, .container, .signup-container {
+    flex-direction: column;
+    justify-content: center;
+    padding: 10%;
+  }
+
+  .hero-image {
+    display: none;
+  }
+
+  .signup-form {
+    width: 40%;
+    max-width: 100%;
+  }
 }
