@@ -1,33 +1,23 @@
 import "./Login.css";
 
-function Login() {
+export default function Login() {
   return (
+    <>
+    <nav className="navbar">
+      <h1 className="logo">BeFit</h1>
+    </nav>
     <div className="login-container">
-      <div className="login-left">
-        <h1 className="logo">BeFit</h1>
-
-        <h2>Welcome back</h2>
-        <p className="subtitle">
-          Enter your details to access your health data.
-        </p>
-
-        <input type="email" placeholder="Email" />
-        <input type="password" placeholder="Password" />
-
-        <a href="#" className="forgot">Forgot password?</a>
-
-        <button className="login-btn">Log in</button>
-
-        <p className="signup-text">
-          Don't have an account? <span>Sign up</span>
-        </p>
+      <div className="login-form">
+        <h2>Welcome back...</h2>
+        <p>Enter your details below</p>
+        <input placeholder="Email"/>
+        <input placeholder="Password"/>
+        <button className="final-login">Log in</button>
       </div>
-
-      <div className="login-right">
-        <img src="/heroimage.jfif" alt="Health" />
+      <div className="hero-image">
+        <img src="/heroimage.jpg" alt="Health" />
       </div>
     </div>
+    </>
   );
 }
-
-export default Login;
