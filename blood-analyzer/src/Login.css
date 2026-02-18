@@ -16,11 +16,12 @@
 }
 
 .login-form {
-    max-width: 450px;
+    max-width: 520px;
     width: 40%;
+    margin-left: 1.5rem;
     display: flex;
     flex-direction: column;
-    padding-left: 3%;
+    padding: 3%;
     gap: 1.3rem;
 }
 
@@ -28,9 +29,8 @@
     font-size: 3rem;
     color: #333;
     margin-bottom: 0.5rem;
-    font-size: clamp(2rem, 4vw, 3rem);
+  font-size: clamp(1.8rem, 4vw, 3rem);
     word-wrap: break-word;
-    overflow-wrap: break-word;
 }
 
 p{
@@ -62,13 +62,13 @@ input:focus {
     font-size: 1rem;
     font-weight: 600;
     cursor: pointer;
-    transition: background 0.3s ease;
 }
 
 .final-login:hover {
-    background-color: white;
-    color: black;
-    border: 2px solid black;
+  background: #3c1ec2;
+  box-shadow: -6px 6px 0 rgba(0, 0, 0, 0.4);
+  transform: translate(1px, -1px);
+  transition: box-shadow 0.15s ease;
 }
 
 @media (max-width: 768px) {
