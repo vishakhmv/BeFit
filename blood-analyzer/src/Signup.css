@@ -59,3 +59,10 @@
   font-weight: 600;
   cursor: pointer;
 }
+
+.signup-form button:hover {
+  background: #3c1ec2;
+  box-shadow: -6px 6px 0 rgba(0, 0, 0, 0.4);
+  transform: translate(1px, -1px);
+  transition: box-shadow 0.15s ease;
+}

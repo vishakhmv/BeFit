@@ -62,13 +62,13 @@ input:focus {
     font-size: 1rem;
     font-weight: 600;
     cursor: pointer;
-    transition: background 0.3s ease;
 }
 
 .final-login:hover {
-    background-color: white;
-    color: black;
-    border: 2px solid black;
+  background: #3c1ec2;
+  box-shadow: -6px 6px 0 rgba(0, 0, 0, 0.4);
+  transform: translate(1px, -1px);
+  transition: box-shadow 0.15s ease;
 }
 
 @media (max-width: 768px) {
