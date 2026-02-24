@@ -1,6 +1,13 @@
+import { useNavigate } from "react-router-dom";
 import "./Signup.css";
 
 export default function Signup() {
+  const navigate = useNavigate();
+
+  const handleSignup = () => {
+    //add the signup logic here
+    navigate("/home");
+  }
   return (
     <>
     <nav className="navbar">
@@ -16,7 +23,7 @@ export default function Signup() {
           <input type="dob" placeholder="D.O.B" />
           <input type="password" placeholder="Password" />
           <input type="password" placeholder="Confirm password" />
-          <button>Create account</button>
+          <button onClick={handleSignup}>Create account</button>
         </div>
 
         <div className="hero-image">
