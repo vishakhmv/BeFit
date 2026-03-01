@@ -21,14 +21,42 @@ app.post("/signup", async (req, res) => {
     let email = req.body.email;
     let password = req.body.password;
     let dob = req.body.dob;
+    let result=await db.query("select * from users where email=$1",[email]);
+    if(result.rows.length===0){
     await db.query(
       "INSERT INTO users (name, email, password, dob) VALUES ($1, $2, $3, $4)",
       [name, email, password, dob],
     );
-    res.redirect("/login");
+    res.render("login");
+  }
+  else{
+    res.render("signup",{error:"Email already exist"});
+  }
   } catch (error) {
     console.log(error);
-    res.status(500);
+    res.status(500).send("Signup failed");
+  }
+});
+
+app.post("/login", async (req, res) => {
+  try {
+    let email = req.body.email;
+    let password = req.body.password;
+    let result = await db.query("select password from users where email=$1", [
+      email,
+    ]);
+    if (result.rows.length > 0) {
+      let user_password = result.rows[0].password;
+      if (password === user_password) {
+        res.render("home");
+      } else {
+        res.render("login", { error: "Email or password is incorrect" });
+      }
+    } else {
+      res.render("login", { error: "Email or password is incorrect" });
+    }
+  } catch (err) {
+    res.render("login", { error: "Email or password is incorrect" });
   }
 });
 
