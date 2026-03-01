@@ -21,11 +21,17 @@ app.post("/signup", async (req, res) => {
     let email = req.body.email;
     let password = req.body.password;
     let dob = req.body.dob;
+    let result=await db.query("select * from users where email=$1",[email]);
+    if(result.rows.length===0){
     await db.query(
       "INSERT INTO users (name, email, password, dob) VALUES ($1, $2, $3, $4)",
       [name, email, password, dob],
     );
     res.render("login");
+  }
+  else{
+    res.render("signup",{error:"Email already exist"});
+  }
   } catch (error) {
     console.log(error);
     res.status(500).send("Signup failed");
