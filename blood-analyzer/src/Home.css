@@ -52,46 +52,66 @@
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  height: 450px;
+  min-height: 450px;
   box-shadow: 0 4px 15px rgba(0,0,0,0.05);
 }
 
 .upload-box {
-  flex: 1;
-  margin-left: 19%;
-  width: 60%;
+  position: relative;
+  width: 100%;
+  max-width: 600px;
+  height: 260px;
+  margin: 0 auto 20px;
   border: 2px dashed #aaa;
   border-radius: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 20px;
+  overflow: hidden;
+  cursor: pointer;
 }
 
-.upload-section {
-  flex: 1;
+
+.drop-zone {
+  position: absolute;
+  inset: 0;
   display: flex;
-  flex-direction: column;
+  align-items: center;
   justify-content: center;
+  text-align: center;
+  padding: 20px;
+  cursor: pointer;
+  font-weight: 500;
+  color: slategray;
 }
 
-.upload-title {
-  font-weight: bold;
-  margin-bottom: 8px;
+.drop-zone input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
 }
 
-.upload-sub {
-  color: #777;
+.upload-box:hover {
+  border-color: #2c5f63;
+  background-color: rgba(44, 95, 99, 0.05);
 }
 
+.preview {
+  position: absolute;
+  bottom: 10px;
+  left: 20px;
+  font-size: 0.85rem;
+  color: #333;
+}
 .upload-btn {
   margin-left: 25%;
   width: 50%;
   padding: 12px;
   border-radius: 16px;
   border: none;
-  background: #2c5f63;
-  color: white;
+  background: darkgrey;
+  color: black;
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
