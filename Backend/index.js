@@ -4,16 +4,27 @@ import bcrypt from "bcrypt";
 import session from "express-session";
 import passport from "passport";
 import { Strategy } from "passport-local";
+import dotenv from "dotenv";
+import cors from "cors";
 
 let port = 5000;
 const saltRounds = 10;
+dotenv.config();
 
 let app = express();
+app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use(
+  cors({
+    origin: "http://localhost:3000",
+    credentials: true,
+  }),
+);
+
+app.use(
   session({
-    secret: "",
+    secret: process.env.SECRET,
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -45,7 +56,7 @@ app.post("/signup", async (req, res) => {
       bcrypt.hash(password, saltRounds, async (err, hash) => {
         if (err) {
           console.error(err);
-          res.status(500).send("Signup failed");
+          res.status(500).json({ message: "Signup failed" });
         } else {
           const insertResult = await db.query(
             "INSERT INTO users (name, email, password, dob) VALUES ($1, $2, $3, $4) RETURNING *",
@@ -57,29 +68,33 @@ app.post("/signup", async (req, res) => {
           req.login(user, (err) => {
             if (err) {
               console.log(err);
-              res.redirect("/login");
+              res.status(500).json({ message: "Login" });
             } else {
-              res.render("home");
+              res.json({ message: "Signup successful", user });
             }
           });
         }
       });
     } else {
-      res.render("signup", { error: "Email already exist" });
+      res.status(400).json({ message: "Email already exists" });
     }
   } catch (error) {
     console.log(error);
-    res.status(500).send("Signup failed");
+    res.status(500).json({ message: "Signup failed" });
   }
 });
 
-app.post(
-  "/login",
-  passport.authenticate("local", {
-    successRedirect: "/home",
-    failureRedirect: "/login",
-  }),
-);
+// app.post(
+//   "/login",
+//   passport.authenticate("local", {
+//     successRedirect: "/home",
+//     failureRedirect: "/login",
+//   }),
+// );
+
+app.post("/login", passport.authenticate("local"), (req, res) => {
+  res.json({ message: "Login successful", user: req.user });
+});
 
 passport.use(
   new Strategy({ usernameField: "email" }, async function verify(
@@ -115,6 +130,14 @@ passport.use(
     }
   }),
 );
+
+app.get("/home", (req, res) => {
+  if (req.isAuthenticated()) {
+    res.json({ user: req.user });
+  } else {
+    res.status(401).json({ message: "Unauthorized" });
+  }
+});
 
 passport.serializeUser((user, cb) => {
   cb(null, user);
