@@ -1,9 +1,15 @@
 import "./Home.css";
 import { useState } from "react";
+import ChatBot from "./ChatBot";
 
 export default function Home() {
   const [height, setHeight] = useState("");
   const [weight, setWeight] = useState("");
+  const [isChatOpen, setIsChatOpen] = useState(false);
+
+  const toggleChat = () => {
+    setIsChatOpen((prev) => !prev);
+  };
 
   return (
     <div className="home-container">
@@ -47,7 +53,15 @@ export default function Home() {
         </main>
     </div>
 
-      <div className="bot-button">🤖</div>
+      {/* Chatbot Popup */}
+      <ChatBot isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
+
+      {/* Robot Icon Button */}
+      <div className="bot-button" onClick={toggleChat}>
+        <span className="material-icons-outlined">
+          {isChatOpen ? "close" : "smart_toy"}
+        </span>
+      </div>
 
     </div>
   );
