@@ -3,6 +3,9 @@ import { useState } from "react";
 
 export default function Home() {
   const [files, setFiles] = useState([]);
+  const clearFiles =() => {
+    setFiles([]);
+  };
 
   const handleDrop = (e) => {
     e.preventDefault();
@@ -38,7 +41,7 @@ export default function Home() {
           <div className="sidebar-item">Todo Tracker</div>
         </aside>
         <main className="main-content">
-          <h2>Upload Your Blood Report</h2>
+          <h2>Upload Your Blood Report's</h2>
           <div className="card">
               <div className="upload-box" onDrop={handleDrop} onDragOver={handleDragOver}>
                 <label className="drop-zone">
@@ -51,8 +54,9 @@ export default function Home() {
                   ))}
                 </ul>
               </div>
+              <button className="clear-btn" onClick={clearFiles} disabled={files.length===0}>Clear Files</button>
               <button className="analyze-btn">
-              Analyze Report & Get Suggestions
+              Analyze Report & Get Suggestion's
               </button>
           </div>
         </main>
