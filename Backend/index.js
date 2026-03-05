@@ -323,17 +323,20 @@ Medications: ${req.body.medicines}
       BLOOD_PROMPT + "\n\nUser Info:\n" + userDetails,
       {
         inlineData: {
-          mimeType: "image/png",
+          mimeType: req.file.mimetype,
           data: imageData,
         },
       },
     ]);
 
     const aiResponse = result.response.text();
-
-    console.log(aiResponse);
+    const clean = aiResponse.replace(/```json|```/g, "");
+    const parsed = JSON.parse(clean);
+    fs.unlinkSync(imagePath);
+    res.json(parsed);
   } catch (error) {
     console.error(error);
+    res.status(500).json({ message: "Analysis failed" });
   }
 });
 
