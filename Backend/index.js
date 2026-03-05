@@ -1,10 +1,9 @@
 import express from "express";
 import bodyParser from "body-parser";
 import pg from "pg";
-import fs from "fs";
 import multer from "multer";
 import dotenv from "dotenv";
-import { GoogleGenerativeAI } from "@google/generative-ai
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 let port = 5000;
 
@@ -19,14 +18,8 @@ const db = new pg.Client({
   port: 5432,
 });
 db.connect();
- // API_Setup
- dotenv.config();
 
-const app = express();
-const port = 3000;
-
-app.use(express.json());
-
+dotenv.config();
 
 const upload = multer({ dest: "uploads/" });
 
