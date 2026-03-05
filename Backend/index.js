@@ -7,8 +7,8 @@ import { Strategy } from "passport-local";
 import dotenv from "dotenv";
 import cors from "cors";
 import multer from "multer";
-import dotenv from "dotenv";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import fs from "fs";
 
 let port = 5000;
 const saltRounds = 10;
@@ -149,10 +149,8 @@ passport.serializeUser((user, cb) => {
 passport.deserializeUser((user, cb) => {
   cb(null, user);
 });
-dotenv.config();
 
 const upload = multer({ dest: "uploads/" });
-
 
 const genAI = new GoogleGenerativeAI(process.env.APIKey);
 const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
@@ -219,11 +217,9 @@ OUTPUT JSON ONLY:
 }
 `;
 
-
-
-app.post("/analyze/:id", async (req, res) => {
-  
-const userDetails = `
+app.post("/analyze", upload.single("report"), async (req, res) => {
+  try {
+    const userDetails = `
 Age: ${req.body.age}
 Gender: ${req.body.gender}
 Height: ${req.body.height}
@@ -231,33 +227,29 @@ Weight: ${req.body.weight}
 Medications: ${req.body.medicines}
 `;
 
-const result = await model.generateContent(
-  BLOOD_PROMPT + "\n\nUser Info:\n" + userDetails + "\n\nReport:\n" + reportText
-);
-// this extracts the actual text output from AI
-const aiResponse = result.response.text();
-   // Convert string JSON to real JSON
-    lastAnalysisResult = JSON.parse(aiResponse);
+    const imagePath = req.file.path;
 
-    res.json(lastAnalysisResult);
+    const imageData = fs.readFileSync(imagePath, {
+      encoding: "base64",
+    });
 
+    const result = await model.generateContent([
+      BLOOD_PROMPT + "\n\nUser Info:\n" + userDetails,
+      {
+        inlineData: {
+          mimeType: "image/png",
+          data: imageData,
+        },
+      },
+    ]);
+
+    const aiResponse = result.response.text();
+
+    console.log(aiResponse);
   } catch (error) {
-    res.status(500).json({ error: "Something went wrong" });
+    console.error(error);
   }
- app.get("/analysis/:id", (req, res) => {
-  if (!lastAnalysisResult) {
-    return res.status(404).json({ message: "No analysis found" });
-  }
-
-  res.json(lastAnalysisResult);
 });
-
-
-
-
-
-
-
 
 app.listen(port, () => {
   console.log(`Your app is listening to port ${port}`);
