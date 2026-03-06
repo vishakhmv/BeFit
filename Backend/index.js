@@ -340,6 +340,79 @@ Medications: ${req.body.medicines}
   }
 });
 
+app.post("/save-tracker", async (req, res) => {
+  try {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const userId = req.user.id;
+
+    const { dietPlan, exercisePlan, waterIntakePerDay, minimumSleepHours } =
+      req.body;
+
+    // save diet
+    for (const day in dietPlan) {
+      const meals = dietPlan[day];
+
+      for (const food of meals.breakfast) {
+        await db.query(
+          "INSERT INTO diet (user_id, day, meal_time, food) VALUES ($1,$2,$3,$4)",
+          [userId, day, "bf", food],
+        );
+      }
+
+      for (const food of meals.lunch) {
+        await db.query(
+          "INSERT INTO diet (user_id, day, meal_time, food) VALUES ($1,$2,$3,$4)",
+          [userId, day, "lu", food],
+        );
+      }
+
+      for (const food of meals.snacks) {
+        await db.query(
+          "INSERT INTO diet (user_id, day, meal_time, food) VALUES ($1,$2,$3,$4)",
+          [userId, day, "sn", food],
+        );
+      }
+
+      for (const food of meals.dinner) {
+        await db.query(
+          "INSERT INTO diet (user_id, day, meal_time, food) VALUES ($1,$2,$3,$4)",
+          [userId, day, "di", food],
+        );
+      }
+    }
+
+    // save exercise
+    for (const day in exercisePlan) {
+      for (const ex of exercisePlan[day]) {
+        await db.query(
+          "INSERT INTO exercise (user_id, day, exercise) VALUES ($1,$2,$3)",
+          [userId, day, ex],
+        );
+      }
+    }
+
+    // save sleep
+    await db.query("INSERT INTO sleep (user_id, sleep_hour) VALUES ($1,$2)", [
+      userId,
+      minimumSleepHours,
+    ]);
+
+    // save water
+    await db.query("INSERT INTO water (user_id, water) VALUES ($1,$2)", [
+      userId,
+      waterIntakePerDay,
+    ]);
+
+    res.json({ message: "Tracker saved successfully" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Saving tracker failed" });
+  }
+});
+
 app.listen(port, () => {
   console.log(`Your app is listening to port ${port}`);
 });
