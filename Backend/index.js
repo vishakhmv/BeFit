@@ -142,6 +142,15 @@ app.get("/home", (req, res) => {
   }
 });
 
+app.post("/logout", (req, res) => {
+  req.logout(function (err) {
+    if (err) {
+      return res.status(500).json({ message: "Logout failed" });
+    }
+    res.json({ message: "Logged out" });
+  });
+});
+
 passport.serializeUser((user, cb) => {
   cb(null, user);
 });
