@@ -415,12 +415,43 @@ app.post("/save-tracker", async (req, res) => {
       waterIntakePerDay,
     ]);
 
+    // update data and analysis_date
+    await db.query(
+      "UPDATE users SET data = 1, analysis_date = NOW() WHERE id = $1",
+      [userId],
+    );
+
     res.json({ message: "Tracker saved successfully" });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Saving tracker failed" });
   }
 });
+
+async function deleteExpiredData() {
+  try {
+    const result = await db.query(
+      "SELECT id FROM users WHERE analysis_date < NOW() - INTERVAL '30 days'",
+    );
+
+    for (const user of result.rows) {
+      const userId = user.id;
+
+      await db.query("DELETE FROM diet WHERE user_id=$1", [userId]);
+      await db.query("DELETE FROM exercise WHERE user_id=$1", [userId]);
+      await db.query("DELETE FROM sleep WHERE user_id=$1", [userId]);
+      await db.query("DELETE FROM water WHERE user_id=$1", [userId]);
+
+      await db.query("UPDATE users SET data = 0 WHERE id=$1", [userId]);
+    }
+
+    console.log("Expired user tracker data cleaned");
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+setInterval(deleteExpiredData, 1000 * 60 * 60 * 24);
 
 app.listen(port, () => {
   console.log(`Your app is listening to port ${port}`);

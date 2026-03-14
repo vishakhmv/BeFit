@@ -5,6 +5,7 @@ CREATE TABLE users (
     password TEXT NOT NULL,
     dob DATE,
     data INT DEFAULT 0
+    analysis_date TIMESTAMP
 );
 
 CREATE TABLE diet (
