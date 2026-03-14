@@ -3,7 +3,8 @@ CREATE TABLE users (
     name VARCHAR(100) NOT NULL,
     email VARCHAR(150) UNIQUE NOT NULL,
     password TEXT NOT NULL,
-    dob DATE
+    dob DATE,
+    data INT DEFAULT 0
 );
 
 CREATE TABLE diet (
