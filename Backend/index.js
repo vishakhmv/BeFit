@@ -431,7 +431,7 @@ app.post("/save-tracker", async (req, res) => {
 async function deleteExpiredData() {
   try {
     const result = await db.query(
-      "SELECT id FROM users WHERE analysis_date < NOW() - INTERVAL '30 days'",
+      "SELECT id FROM users WHERE analysis_date IS NOT NULL AND analysis_date < NOW() - INTERVAL '30 days'",
     );
 
     for (const user of result.rows) {
