@@ -171,11 +171,12 @@ You are an AI blood test report analyzer.
 The user will upload an image of a blood test report along with personal details.
 
 User Details Provided:
-- Age
-- Gender
-- Height
-- Weight
-- Current medications
+
+* Age
+* Gender
+* Height
+* Weight
+* Current medications
 
 IMPORTANT RULES:
 
@@ -186,23 +187,50 @@ IMPORTANT RULES:
 5. The analysis must be simple and easy for a normal person to understand.
 6. If medicines are listed, explain whether the abnormal values could be influenced by those medicines.
 
+ANTI-HALLUCINATION RULES:
+
+1. Extract ONLY blood parameters and values clearly visible in the report.
+2. NEVER guess, assume, or invent blood parameters or values.
+3. If ANY value cannot be clearly read, RETURN THE ERROR RESPONSE immediately.
+4. Do NOT create parameters that are not present in the report.
+5. Copy values exactly as shown in the report including units.
+6. If the report image is unclear, blurry, incomplete, or extraction is uncertain, RETURN THE ERROR RESPONSE.
+
+ERROR RESPONSE:
+
+If the report cannot be reliably analyzed, return ONLY this JSON:
+
+{
+"error": "Unable to reliably analyze the blood test report image"
+}
+
+If an error is returned:
+
+* Do NOT generate results
+* Do NOT generate dietPlan
+* Do NOT generate exercisePlan
+* Do NOT generate waterIntakePerDay
+* Do NOT generate minimumSleepHours
+
 TASK:
 
 1. Extract ALL blood parameters visible in the report.
 
 For EACH blood parameter provide:
 
-- name
-- value (with unit)
-- status (LOW / NORMAL / HIGH)
+* name
+* value (with unit)
+* status (LOW / NORMAL / HIGH / UNKNOWN)
 
 If the status is LOW or HIGH also include:
 
-- issues (simple explanation of what this means)
-- whyItHappens (common causes)
-- medicineInteractionNote (explain if the user's medicines could influence this result)
+* issues (simple explanation of what this means)
+* whyItHappens (common causes)
+* medicineInteractionNote (explain if the user's medicines could influence this result)
 
-If the value is NORMAL, issues and whyItHappens can be empty strings.
+If the value is NORMAL:
+issues = ""
+whyItHappens = ""
 
 DIET PLAN REQUIREMENTS:
 
@@ -212,10 +240,11 @@ Rules:
 
 1. Diet must be UNIQUE for each day.
 2. Each day must include:
-   - breakfast
-   - lunch
-   - snacks
-   - dinner
+
+   * breakfast
+   * lunch
+   * snacks
+   * dinner
 3. Each meal must be an ARRAY of food suggestions.
 4. Food suggestions should be simple and realistic.
 
@@ -227,92 +256,87 @@ EXERCISE PLAN REQUIREMENTS:
 
 Also provide:
 
-- waterIntakePerDay (based on user's weight)
-- minimumSleepHours (recommended minimum hours of sleep per night based on age)
-
-IMPORTANT:
-
-If any parameter is LOW or HIGH include a short warning in the explanation:
-
-"Please consult a doctor. This is only AI guidance and not a medical diagnosis."
+* waterIntakePerDay (based on user's weight)
+* minimumSleepHours (recommended minimum hours of sleep per night based on age)
 
 OUTPUT STRICT JSON ONLY.
 
 OUTPUT FORMAT:
 
 {
-  "results": [
-    {
-      "name": "",
-      "value": "",
-      "status": "",
-      "issues": "",
-      "whyItHappens": "",
-      "medicineInteractionNote": ""
-    }
-  ],
+"results": [
+{
+"name": "",
+"value": "",
+"status": "",
+"issues": "",
+"whyItHappens": "",
+"medicineInteractionNote": ""
+}
+],
 
-  "dietPlan": {
-    "monday": {
-      "breakfast": [],
-      "lunch": [],
-      "snacks": [],
-      "dinner": []
-    },
-    "tuesday": {
-      "breakfast": [],
-      "lunch": [],
-      "snacks": [],
-      "dinner": []
-    },
-    "wednesday": {
-      "breakfast": [],
-      "lunch": [],
-      "snacks": [],
-      "dinner": []
-    },
-    "thursday": {
-      "breakfast": [],
-      "lunch": [],
-      "snacks": [],
-      "dinner": []
-    },
-    "friday": {
-      "breakfast": [],
-      "lunch": [],
-      "snacks": [],
-      "dinner": []
-    },
-    "saturday": {
-      "breakfast": [],
-      "lunch": [],
-      "snacks": [],
-      "dinner": []
-    },
-    "sunday": {
-      "breakfast": [],
-      "lunch": [],
-      "snacks": [],
-      "dinner": []
-    }
-  },
+"dietPlan": {
+"monday": {
+"breakfast": [],
+"lunch": [],
+"snacks": [],
+"dinner": []
+},
+"tuesday": {
+"breakfast": [],
+"lunch": [],
+"snacks": [],
+"dinner": []
+},
+"wednesday": {
+"breakfast": [],
+"lunch": [],
+"snacks": [],
+"dinner": []
+},
+"thursday": {
+"breakfast": [],
+"lunch": [],
+"snacks": [],
+"dinner": []
+},
+"friday": {
+"breakfast": [],
+"lunch": [],
+"snacks": [],
+"dinner": []
+},
+"saturday": {
+"breakfast": [],
+"lunch": [],
+"snacks": [],
+"dinner": []
+},
+"sunday": {
+"breakfast": [],
+"lunch": [],
+"snacks": [],
+"dinner": []
+}
+},
 
-  "exercisePlan": {
-    "monday": [],
-    "tuesday": [],
-    "wednesday": [],
-    "thursday": [],
-    "friday": [],
-    "saturday": [],
-    "sunday": []
-  },
+"exercisePlan": {
+"monday": [],
+"tuesday": [],
+"wednesday": [],
+"thursday": [],
+"friday": [],
+"saturday": [],
+"sunday": []
+},
 
-  "waterIntakePerDay": "",
-  "minimumSleepHours": ""
+"waterIntakePerDay": "",
+"minimumSleepHours": ""
 }
 `;
 
 app.post("/analyze", upload.single("report"), async (req, res) => {
+  let imagePath;
   try {
     const userDetails = `
 Age: ${req.body.age}
@@ -322,7 +346,7 @@ Weight: ${req.body.weight}
 Medications: ${req.body.medicines}
 `;
 
-    const imagePath = req.file.path;
+    imagePath = req.file.path;
 
     const imageData = fs.readFileSync(imagePath, {
       encoding: "base64",
@@ -341,9 +365,16 @@ Medications: ${req.body.medicines}
     const aiResponse = result.response.text();
     const clean = aiResponse.replace(/```json|```/g, "");
     const parsed = JSON.parse(clean);
+    if (parsed.error) {
+      fs.unlinkSync(imagePath);
+      return res.status(400).json(parsed);
+    }
     fs.unlinkSync(imagePath);
     res.json(parsed);
   } catch (error) {
+    if (imagePath && fs.existsSync(imagePath)) {
+      fs.unlinkSync(imagePath);
+    }
     console.error(error);
     res.status(500).json({ message: "Analysis failed" });
   }
