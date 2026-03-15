@@ -482,6 +482,31 @@ async function deleteExpiredData() {
   }
 }
 
+app.post("/reset-tracker", async (req, res) => {
+  try {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const userId = req.user.id;
+
+    await db.query("DELETE FROM diet WHERE user_id=$1", [userId]);
+    await db.query("DELETE FROM exercise WHERE user_id=$1", [userId]);
+    await db.query("DELETE FROM sleep WHERE user_id=$1", [userId]);
+    await db.query("DELETE FROM water WHERE user_id=$1", [userId]);
+
+    await db.query(
+      "UPDATE users SET data = 0, analysis_date = NULL WHERE id=$1",
+      [userId],
+    );
+
+    res.json({ message: "Tracker reset successfully" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Reset failed" });
+  }
+});
+
 setInterval(deleteExpiredData, 1000 * 60 * 60 * 24);
 
 app.listen(port, () => {
