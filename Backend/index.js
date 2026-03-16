@@ -509,6 +509,40 @@ app.post("/reset-tracker", async (req, res) => {
 
 setInterval(deleteExpiredData, 1000 * 60 * 60 * 24);
 
+app.get("/get-tracker", async (req, res) => {
+  try {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const userId = req.user.id;
+
+    // check data flag first
+    const userResult = await db.query("SELECT data FROM users WHERE id=$1", [userId]);
+    const user = userResult.rows[0];
+
+    if (!user || user.data === 0) {
+      return res.json({ hasData: false });
+    }
+
+    const diet     = await db.query("SELECT * FROM diet WHERE user_id=$1", [userId]);
+    const exercise = await db.query("SELECT * FROM exercise WHERE user_id=$1", [userId]);
+    const sleep    = await db.query("SELECT * FROM sleep WHERE user_id=$1 ORDER BY id DESC LIMIT 1", [userId]);
+    const water    = await db.query("SELECT * FROM water WHERE user_id=$1 ORDER BY id DESC LIMIT 1", [userId]);
+
+    res.json({
+      hasData:  true,
+      diet:     diet.rows,
+      exercise: exercise.rows,
+      sleep:    sleep.rows[0] || null,
+      water:    water.rows[0] || null,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to fetch tracker" });
+  }
+});
+
 app.listen(port, () => {
   console.log(`Your app is listening to port ${port}`);
 });
