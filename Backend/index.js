@@ -422,6 +422,12 @@ app.post("/save-tracker", async (req, res) => {
           [userId, day, "di", food],
         );
       }
+      await fetch("http://localhost:5000/save-tracker", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(result),
+      });
     }
 
     // save exercise
