@@ -1,10 +1,26 @@
 import "./Home.css";
 import { useState } from "react";
-import TodoTracker from "./TodoTracker";  
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import TodoTracker from "./TodoTracker";
 
 export default function Home() {
+  const navigate = useNavigate();
   const [files, setFiles] = useState([]);
-  const [view, setView] = useState("dashboard");  
+  const [view, setView] = useState("dashboard");
+  
+  useEffect(() => {
+  fetch("http://localhost:3000/home", {
+    credentials: "include",
+  })
+    .then(res => {
+      if (res.status === 401) {
+        navigate("/login");
+      }
+    })
+    .catch(() => navigate("/login"));
+  }, []);
+
 
   const clearFiles = () => setFiles([]);
 

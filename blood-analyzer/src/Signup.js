@@ -1,12 +1,37 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./Signup.css";
+
+const [form, setForm] = useState({
+  name: "",
+  email: "",
+  dob: "",
+  password: "",
+});
 
 export default function Signup() {
   const navigate = useNavigate();
 
-  const handleSignup = () => {
-    //add the signup logic here
+  const handleSignup = async () => {
+    try {
+    const res = await fetch("http://localhost:5000/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(form),
+      });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+        alert(data.message);
+        return;
+    }
+
     navigate("/home");
+    }catch (err) {
+      console.error(err);
+    }
   }
   return (
     <>
@@ -18,10 +43,10 @@ export default function Signup() {
           <h2>Create an Account</h2>
           <p>Start your health journey today</p>
 
-          <input type="text" placeholder="Full Name" />
-          <input type="email" placeholder="Email" />
-          <input type="dob" placeholder="D.O.B" />
-          <input type="password" placeholder="Password" />
+          <input type="text" placeholder="Full Name" onChange={(e) => setForm({...form, name: e.target.value})}/>
+          <input type="email" placeholder="Email" onChange={(e) => setForm({...form, email: e.target.value})}/>
+          <input type="dob" placeholder="D.O.B" onChange={(e) => setForm({...form, dob: e.target.value})}/>
+          <input type="password" placeholder="Password" onChange={(e) => setForm({...form, password: e.target.value})}/>
           <input type="password" placeholder="Confirm password" />
           <button onClick={handleSignup}>Create account</button>
         </div>
