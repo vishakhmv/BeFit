@@ -4,6 +4,7 @@ import App from "./App";
 import Signup from "./Signup";
 import Login from "./Login";
 import Home from "./Home";
+import TodoTracker from "./TodoTracker";  
 import "./index.css";
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
@@ -14,6 +15,7 @@ root.render(
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
       <Route path="/Home" element={<Home/>} />
+      <Route path="/todo" element={<TodoTracker />} /> 
     </Routes>
   </BrowserRouter>
 );
