@@ -57,6 +57,19 @@ export default function Home() {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
 
+    // Check if API key is configured
+    if (!API_KEY) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "bot",
+          text: "❌ Error: API key not found. Please set REACT_APP_GEMINI_API_KEY in your .env file.",
+          time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        },
+      ]);
+      return;
+    }
+
     const userMessage = {
       role: "user",
       text: input.trim(),
@@ -69,9 +82,13 @@ export default function Home() {
 
     try {
       const genAI = new GoogleGenerativeAI(API_KEY);
-      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-      const chatHistory = messages.map((msg) => ({
+      // Filter messages to start from the first user message (Gemini API requires first message to be from user)
+      const firstUserIndex = messages.findIndex((msg) => msg.role === "user");
+      const conversationMessages = firstUserIndex !== -1 ? messages.slice(firstUserIndex) : [];
+
+      const chatHistory = conversationMessages.map((msg) => ({
         role: msg.role === "bot" ? "model" : "user",
         parts: [{ text: msg.text }],
       }));
@@ -98,12 +115,35 @@ export default function Home() {
         },
       ]);
     } catch (error) {
-      console.error("Gemini API error:", error);
+      const errorStr = JSON.stringify(error);
+      console.error("Gemini API error details:", {
+        message: error.message,
+        status: error.status,
+        statusText: error.statusText,
+        errorString: errorStr,
+        fullError: error,
+      });
+      console.log("Full error object:", error);
+      
+      let errorMessage = error.message || "Sorry, I'm having trouble connecting right now. Please check your API key or try again later.";
+      
+      // Provide specific error messages for common issues
+      const lowerError = errorStr.toLowerCase();
+      if (lowerError.includes("401") || lowerError.includes("invalid") || lowerError.includes("unauthorized")) {
+        errorMessage = "❌ API Key Error - Your API key may be invalid or expired. Check: https://console.cloud.google.com/";
+      } else if (lowerError.includes("429")) {
+        errorMessage = "⏳ Rate limit exceeded - Please wait a moment and try again.";
+      } else if (lowerError.includes("cors")) {
+        errorMessage = "🔒 CORS error - This may require backend configuration.";
+      } else if (lowerError.includes("network")) {
+        errorMessage = "🌐 Network error - Check your internet connection.";
+      }
+      
       setMessages((prev) => [
         ...prev,
         {
           role: "bot",
-          text: "Sorry, I'm having trouble connecting right now. Please check your API key or try again later.",
+          text: errorMessage,
           time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         },
       ]);
@@ -162,7 +202,9 @@ export default function Home() {
         </main>
       </div>
 
-      <div className="bot-button" onClick={() => setIsChatOpen(true)}>🤖</div>
+      <div className="bot-button" onClick={() => setIsChatOpen(!isChatOpen)}>
+        <span className="material-icons-outlined">smart_toy</span>
+      </div>
 
       {/* Chatbot */}
       {isChatOpen && (
