@@ -45,24 +45,29 @@ export default function ChatBot({ isOpen, onClose }) {
 
     try {
       const genAI = new GoogleGenerativeAI(API_KEY);
-      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+      
+      // 1. We moved the systemInstruction up here into the model!
+      const model = genAI.getGenerativeModel({ 
+        model: "gemini-2.0-flash",
+        systemInstruction: "You are BeFit Assistant, a friendly and knowledgeable health and fitness AI. You help users understand their blood reports, suggest workout plans, provide nutrition advice, and answer general health questions. Keep responses concise, helpful, and easy to understand. Always remind users to consult healthcare professionals for serious medical concerns."
+      });
 
-      // Build conversation history for context
-      const chatHistory = messages.map((msg) => ({
+      // Build conversation history for context (keeping our .slice(1) fix!)
+      const chatHistory = messages.slice(1).map((msg) => ({
         role: msg.role === "bot" ? "model" : "user",
         parts: [{ text: msg.text }],
       }));
 
+      // 2. startChat is now clean and only handles the history and config
       const chat = model.startChat({
         history: chatHistory,
         generationConfig: {
           maxOutputTokens: 1000,
-        },
-        systemInstruction:
-          "You are BeFit Assistant, a friendly and knowledgeable health and fitness AI. You help users understand their blood reports, suggest workout plans, provide nutrition advice, and answer general health questions. Keep responses concise, helpful, and easy to understand. Always remind users to consult healthcare professionals for serious medical concerns.",
+        }
       });
 
       const result = await chat.sendMessage(userMessage.text);
+      // ... the rest of your code stays exactly the same
       const response = await result.response;
       const botText = response.text();
 
