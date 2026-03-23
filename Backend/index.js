@@ -9,7 +9,8 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import fs from "fs";
 import cors from "cors";
 import dotenv from "dotenv";
-
+import twilio from "twilio";
+import cron from "node-cron";
 // Load the hidden variables from your .env file
 dotenv.config();
 
@@ -23,7 +24,7 @@ app.use(express.urlencoded({ extended: true }));
 // Teammate's secure CORS settings for React and Passport
 app.use(
   cors({
-    origin: "http://localhost:3000",
+    origin: ["http://localhost:3000", "http://localhost:3003", "http://localhost:3005"],
     credentials: true,
   })
 );
@@ -55,6 +56,9 @@ db.connect()
   .then(() => console.log("✅ Connected to BeFit DB securely!"))
   .catch((err) => console.error("❌ DB connection error:", err.stack));
 
+// Connect to Twilio
+const twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+
 // Teammate's Secure Signup Route
 app.post("/signup", async (req, res) => {
   try {
@@ -62,6 +66,7 @@ app.post("/signup", async (req, res) => {
     let email = req.body.email;
     let password = req.body.password;
     let dob = req.body.dob;
+    let whatsapp = req.body.whatsapp;
     let result = await db.query("select * from users where email=$1", [email]);
     
     if (result.rows.length === 0) {
@@ -71,8 +76,8 @@ app.post("/signup", async (req, res) => {
           res.status(500).json({ message: "Signup failed" });
         } else {
           const insertResult = await db.query(
-            "INSERT INTO users (name, email, password, dob) VALUES ($1, $2, $3, $4) RETURNING *",
-            [name, email, hash, dob],
+            "INSERT INTO users (name, email, password, dob, whatsapp_number) VALUES ($1, $2, $3, $4, $5) RETURNING *",
+            [name, email, hash, dob, whatsapp],
           );
 
           const user = insertResult.rows[0];
@@ -544,6 +549,39 @@ app.get("/get-tracker", async (req, res) => {
     res.status(500).json({ message: "Failed to fetch tracker" });
   }
 });
+
+// THE TWILIO ALARM CLOCK (Runs every day at 9 AM)
+cron.schedule("0 9 * * *", async () => {
+  try {
+    console.log("⏰ Alarm Clock waking up to check for reminders...");
+
+    // 1. Find all users who have uploaded a report (data = 1) and get their water goal
+    const result = await db.query(`
+      SELECT users.name, users.whatsapp_number, water.water
+      FROM users
+      JOIN water ON users.id = water.user_id
+      WHERE users.data = 1
+    `);
+
+    // 2. Loop through every user we found
+    for (const user of result.rows) {
+      if (user.whatsapp_number) {
+        
+        // 3. Send them a personalized WhatsApp message
+        await twilioClient.messages.create({
+          body: `Hello ${user.name}! 💧 This is your BeFit reminder to drink your ${user.water} of water today! Keep up the great work.`,
+          from: "whatsapp:+14155238886", // Hardcoded to guarantee the channel matches!
+          to: "whatsapp:" + user.whatsapp_number 
+        });
+        
+        console.log(`✅ WhatsApp sent to ${user.name}`);
+      }
+    }
+  } catch (error) {
+    console.error("❌ Twilio Cron Error:", error);
+  }
+});
+
 
 app.listen(port, () => {
   console.log(`🚀 Your app is listening to port ${port}`);
