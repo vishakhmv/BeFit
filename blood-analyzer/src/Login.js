@@ -1,10 +1,10 @@
 import { useNavigate } from "react-router-dom";
+import { useState } from "react";
 import "./Login.css";
 
-const [email, setEmail] = useState("");
-const [password, setPassword] = useState("");
-
 export default function Login() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const navigate = useNavigate();
 
   const handleLogin = async () => {

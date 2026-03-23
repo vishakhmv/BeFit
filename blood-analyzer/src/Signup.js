@@ -2,14 +2,13 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./Signup.css";
 
-const [form, setForm] = useState({
+export default function Signup() {
+  const [form, setForm] = useState({
   name: "",
   email: "",
   dob: "",
   password: "",
 });
-
-export default function Signup() {
   const navigate = useNavigate();
 
   const handleSignup = async () => {
