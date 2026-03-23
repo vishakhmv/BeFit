@@ -1,12 +1,33 @@
 import { useNavigate } from "react-router-dom";
 import "./Login.css";
 
+const [email, setEmail] = useState("");
+const [password, setPassword] = useState("");
+
 export default function Login() {
   const navigate = useNavigate();
 
-  const handleLogin = () => {
-    //hey vishak, here's where u can add the authentication logic for logging in
+  const handleLogin = async () => {
+    try {
+    const res = await fetch("http://localhost:3000/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email, password }),
+      });
+
+    if (!res.ok) {
+        alert("Invalid credentials");
+        return;
+      }
+
+    const data = await res.json();
+    console.log(data);
+
     navigate("/home");
+    } catch (err) {
+      console.error(err);
+    }
   }
   return (
     <>
@@ -17,8 +38,8 @@ export default function Login() {
       <div className="login-form">
         <h2>Welcome back...</h2>
         <p>Enter your details below</p>
-        <input placeholder="Email"/>
-        <input placeholder="Password"/>
+        <input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)}/>
+        <input placeholder="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)}/>
         <button className="final-login" onClick={handleLogin}>Log in</button>
       </div>
       <div className="hero-image">
