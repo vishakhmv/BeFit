@@ -189,17 +189,17 @@ IMPORTANT RULES:
 2. Do NOT repeat the user's personal details in the output.
 3. Do NOT diagnose diseases.
 4. If any parameter is LOW or HIGH, clearly state that the user should consult a doctor.
-5. The analysis must be simple and easy for a normal person to understand.
-6. "overall summary" must be a simple explanation of the full blood report, highlighting major normal and abnormal findings.
+5. Keep the analysis simple and easy to understand.
+6. "overall summary" must clearly explain the full report with major findings.
 
 ANTI-HALLUCINATION RULES:
 
-1. Extract ONLY blood parameters and values clearly visible in the report.
-2. NEVER guess, assume, or invent values.
-3. If ANY value cannot be clearly read, RETURN THE ERROR RESPONSE immediately.
-4. Do NOT create parameters not present in the report.
+1. Extract ONLY visible parameters.
+2. NEVER guess or assume values.
+3. If ANY value is unclear → RETURN ERROR.
+4. Do NOT add extra parameters.
 5. Copy values exactly with units.
-6. If the image is unclear or incomplete, RETURN THE ERROR RESPONSE.
+6. If image is unclear → RETURN ERROR.
 
 ERROR RESPONSE:
 
@@ -207,8 +207,7 @@ ERROR RESPONSE:
 "error": "Unable to reliably analyze the blood test report image"
 }
 
-If error:
-- Do NOT generate anything else.
+If error → STOP.
 
 TASK:
 
@@ -222,48 +221,63 @@ For EACH parameter return:
 * issues
 * whyItHappens
 * summary
+* whatIfLow
+* whatIfHigh
 
 RULES:
 
-1. If status = LOW or HIGH:
+1. If status = LOW:
 
 - issues → simple meaning
 - whyItHappens → common causes
-- summary → short explanation combining value, status, and meaning
+- summary → explain value + LOW meaning
+- whatIfLow → explain what LOW means for this parameter
+- whatIfHigh → explain what HIGH would mean for this parameter
 
-2. If status = NORMAL:
+2. If status = HIGH:
+
+- issues → simple meaning
+- whyItHappens → common causes
+- summary → explain value + HIGH meaning
+- whatIfLow → explain what LOW would mean for this parameter
+- whatIfHigh → explain what HIGH means for this parameter
+
+3. If status = NORMAL:
 
 - issues = "none"
 - whyItHappens = "none"
 - summary = "This parameter is within the normal range."
+- whatIfLow → explain what LOW would mean for this parameter
+- whatIfHigh → explain what HIGH would mean for this parameter
 
-3. If status = UNKNOWN:
+4. If status = UNKNOWN:
 
 - issues = "unclear"
 - whyItHappens = "unclear"
-- summary = "Unable to determine the status from the report."
+- summary = "Unable to determine the status."
+- whatIfLow → general explanation if low
+- whatIfHigh → general explanation if high
 
-DIET PLAN REQUIREMENTS:
+DIET PLAN:
 
-- 7 days (Monday–Sunday)
+- 7 days (Monday-Sunday)
 - Each day: breakfast, lunch, snacks, dinner
-- Each meal must be an ARRAY
-- Food should be simple and realistic
+- Each meal = ARRAY
+- Keep it simple
 
-EXERCISE PLAN REQUIREMENTS:
+EXERCISE PLAN:
 
 - 7 days
-- Each day must be an ARRAY of exercises
-- Exercises must be safe based on age
+- Each day = ARRAY
 
-ALSO PROVIDE:
+ALSO INCLUDE:
 
 - waterIntakePerDay (based on weight)
 - minimumSleepHours (based on age)
 
 OUTPUT STRICT JSON ONLY.
 
-OUTPUT FORMAT:
+FORMAT:
 
 {
 "results": [
@@ -273,7 +287,9 @@ OUTPUT FORMAT:
 "status": "",
 "issues": "",
 "whyItHappens": "",
-"summary": ""
+"summary": "",
+"whatIfLow": "",
+"whatIfHigh": ""
 }
 ],
 
