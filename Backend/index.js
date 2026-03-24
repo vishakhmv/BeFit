@@ -180,10 +180,8 @@ The user will upload an image of a blood test report along with personal details
 User Details Provided:
 
 * Age
-* Gender
 * Height
 * Weight
-* Current medications
 
 IMPORTANT RULES:
 
@@ -192,79 +190,76 @@ IMPORTANT RULES:
 3. Do NOT diagnose diseases.
 4. If any parameter is LOW or HIGH, clearly state that the user should consult a doctor.
 5. The analysis must be simple and easy for a normal person to understand.
-6. If medicines are listed, explain whether the abnormal values could be influenced by those medicines.
+6. "overall summary" must be a simple explanation of the full blood report, highlighting major normal and abnormal findings.
 
 ANTI-HALLUCINATION RULES:
 
 1. Extract ONLY blood parameters and values clearly visible in the report.
-2. NEVER guess, assume, or invent blood parameters or values.
+2. NEVER guess, assume, or invent values.
 3. If ANY value cannot be clearly read, RETURN THE ERROR RESPONSE immediately.
-4. Do NOT create parameters that are not present in the report.
-5. Copy values exactly as shown in the report including units.
-6. If the report image is unclear, blurry, incomplete, or extraction is uncertain, RETURN THE ERROR RESPONSE.
+4. Do NOT create parameters not present in the report.
+5. Copy values exactly with units.
+6. If the image is unclear or incomplete, RETURN THE ERROR RESPONSE.
 
 ERROR RESPONSE:
-
-If the report cannot be reliably analyzed, return ONLY this JSON:
 
 {
 "error": "Unable to reliably analyze the blood test report image"
 }
 
-If an error is returned:
-
-* Do NOT generate results
-* Do NOT generate dietPlan
-* Do NOT generate exercisePlan
-* Do NOT generate waterIntakePerDay
-* Do NOT generate minimumSleepHours
+If error:
+- Do NOT generate anything else.
 
 TASK:
 
-1. Extract ALL blood parameters visible in the report.
+Extract ALL visible blood parameters.
 
-For EACH blood parameter provide:
+For EACH parameter return:
 
 * name
 * value (with unit)
 * status (LOW / NORMAL / HIGH / UNKNOWN)
+* issues
+* whyItHappens
+* summary
 
-If the status is LOW or HIGH also include:
+RULES:
 
-* issues (simple explanation of what this means)
-* whyItHappens (common causes)
-* medicineInteractionNote (explain if the user's medicines could influence this result)
+1. If status = LOW or HIGH:
 
-If the value is NORMAL:
-issues = ""
-whyItHappens = ""
+- issues → simple meaning
+- whyItHappens → common causes
+- summary → short explanation combining value, status, and meaning
+
+2. If status = NORMAL:
+
+- issues = "none"
+- whyItHappens = "none"
+- summary = "This parameter is within the normal range."
+
+3. If status = UNKNOWN:
+
+- issues = "unclear"
+- whyItHappens = "unclear"
+- summary = "Unable to determine the status from the report."
 
 DIET PLAN REQUIREMENTS:
 
-Create a healthy weekly diet plan personalized for the user.
-
-Rules:
-
-1. Diet must be UNIQUE for each day.
-2. Each day must include:
-
-   * breakfast
-   * lunch
-   * snacks
-   * dinner
-3. Each meal must be an ARRAY of food suggestions.
-4. Food suggestions should be simple and realistic.
+- 7 days (Monday–Sunday)
+- Each day: breakfast, lunch, snacks, dinner
+- Each meal must be an ARRAY
+- Food should be simple and realistic
 
 EXERCISE PLAN REQUIREMENTS:
 
-1. Provide a weekly exercise plan.
-2. Each day must contain an ARRAY of exercises.
-3. Exercises must be safe based on the user's age.
+- 7 days
+- Each day must be an ARRAY of exercises
+- Exercises must be safe based on age
 
-Also provide:
+ALSO PROVIDE:
 
-* waterIntakePerDay (based on user's weight)
-* minimumSleepHours (recommended minimum hours of sleep per night based on age)
+- waterIntakePerDay (based on weight)
+- minimumSleepHours (based on age)
 
 OUTPUT STRICT JSON ONLY.
 
@@ -278,53 +273,18 @@ OUTPUT FORMAT:
 "status": "",
 "issues": "",
 "whyItHappens": "",
-"medicineInteractionNote": ""
+"summary": ""
 }
 ],
 
 "dietPlan": {
-"monday": {
-"breakfast": [],
-"lunch": [],
-"snacks": [],
-"dinner": []
-},
-"tuesday": {
-"breakfast": [],
-"lunch": [],
-"snacks": [],
-"dinner": []
-},
-"wednesday": {
-"breakfast": [],
-"lunch": [],
-"snacks": [],
-"dinner": []
-},
-"thursday": {
-"breakfast": [],
-"lunch": [],
-"snacks": [],
-"dinner": []
-},
-"friday": {
-"breakfast": [],
-"lunch": [],
-"snacks": [],
-"dinner": []
-},
-"saturday": {
-"breakfast": [],
-"lunch": [],
-"snacks": [],
-"dinner": []
-},
-"sunday": {
-"breakfast": [],
-"lunch": [],
-"snacks": [],
-"dinner": []
-}
+"monday": {"breakfast": [],"lunch": [],"snacks": [],"dinner": []},
+"tuesday": {"breakfast": [],"lunch": [],"snacks": [],"dinner": []},
+"wednesday": {"breakfast": [],"lunch": [],"snacks": [],"dinner": []},
+"thursday": {"breakfast": [],"lunch": [],"snacks": [],"dinner": []},
+"friday": {"breakfast": [],"lunch": [],"snacks": [],"dinner": []},
+"saturday": {"breakfast": [],"lunch": [],"snacks": [],"dinner": []},
+"sunday": {"breakfast": [],"lunch": [],"snacks": [],"dinner": []}
 },
 
 "exercisePlan": {
@@ -338,7 +298,8 @@ OUTPUT FORMAT:
 },
 
 "waterIntakePerDay": "",
-"minimumSleepHours": ""
+"minimumSleepHours": "",
+"overall summary": ""
 }
 `;
 
@@ -474,31 +435,6 @@ async function deleteExpiredData() {
     console.error(err);
   }
 }
-
-app.post("/reset-tracker", async (req, res) => {
-  try {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
-    const userId = req.user.id;
-
-    await db.query("DELETE FROM diet WHERE user_id=$1", [userId]);
-    await db.query("DELETE FROM exercise WHERE user_id=$1", [userId]);
-    await db.query("DELETE FROM sleep WHERE user_id=$1", [userId]);
-    await db.query("DELETE FROM water WHERE user_id=$1", [userId]);
-
-    await db.query(
-      "UPDATE users SET data = 0, analysis_date = NULL WHERE id=$1",
-      [userId],
-    );
-
-    res.json({ message: "Tracker reset successfully" });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Reset failed" });
-  }
-});
 
 setInterval(deleteExpiredData, 1000 * 60 * 60 * 24);
 
