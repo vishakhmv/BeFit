@@ -169,7 +169,7 @@ const upload = multer({ dest: "uploads/" });
 
 // Generative AI Connection
 const genAI = new GoogleGenerativeAI(process.env.APIKey);
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
 
 /* BLOOD EXTRACTION PROMPT*/
 const BLOOD_PROMPT = `
@@ -342,6 +342,8 @@ OUTPUT FORMAT:
 }
 `;
 
+console.log(BLOOD_PROMPT);
+
 app.post("/analyze", upload.single("report"), async (req, res) => {
   let imagePath;
   try {
@@ -388,76 +390,57 @@ Medications: ${req.body.medicines}
 });
 
 app.post("/save-tracker", async (req, res) => {
+  console.log("🚪 Someone knocked on the /save-tracker door!"); // <-- ADD THIS
+  
   try {
     if (!req.isAuthenticated()) {
+      console.log("❌ Blocked! User is not logged in (Session wiped)."); // <-- ADD THIS
       return res.status(401).json({ message: "Unauthorized" });
     }
 
+    console.log("🔓 User is authenticated. Saving data..."); // <-- ADD THIS
     const userId = req.user.id;
+    const { dietPlan, exercisePlan, waterIntakePerDay, minimumSleepHours } = req.body;
 
-    const { dietPlan, exercisePlan, waterIntakePerDay, minimumSleepHours } =
-      req.body;
+    // 1. CLEANUP: Delete old plans so we don't spam the Todo Tracker
+    await db.query("DELETE FROM diet WHERE user_id=$1", [userId]);
+    await db.query("DELETE FROM exercise WHERE user_id=$1", [userId]);
+    await db.query("DELETE FROM sleep WHERE user_id=$1", [userId]);
+    await db.query("DELETE FROM water WHERE user_id=$1", [userId]);
 
-    // save diet
+    // 2. Save Diet (The infinite fetch loop has been removed from here)
     for (const day in dietPlan) {
       const meals = dietPlan[day];
 
       for (const food of meals.breakfast) {
-        await db.query(
-          "INSERT INTO diet (user_id, day, meal_time, food) VALUES ($1,$2,$3,$4)",
-          [userId, day, "bf", food],
-        );
+        await db.query("INSERT INTO diet (user_id, day, meal_time, food) VALUES ($1,$2,$3,$4)", [userId, day, "bf", food]);
       }
-
       for (const food of meals.lunch) {
-        await db.query(
-          "INSERT INTO diet (user_id, day, meal_time, food) VALUES ($1,$2,$3,$4)",
-          [userId, day, "lu", food],
-        );
+        await db.query("INSERT INTO diet (user_id, day, meal_time, food) VALUES ($1,$2,$3,$4)", [userId, day, "lu", food]);
       }
-
       for (const food of meals.snacks) {
-        await db.query(
-          "INSERT INTO diet (user_id, day, meal_time, food) VALUES ($1,$2,$3,$4)",
-          [userId, day, "sn", food],
-        );
+        await db.query("INSERT INTO diet (user_id, day, meal_time, food) VALUES ($1,$2,$3,$4)", [userId, day, "sn", food]);
       }
-
       for (const food of meals.dinner) {
-        await db.query(
-          "INSERT INTO diet (user_id, day, meal_time, food) VALUES ($1,$2,$3,$4)",
-          [userId, day, "di", food],
-        );
+        await db.query("INSERT INTO diet (user_id, day, meal_time, food) VALUES ($1,$2,$3,$4)", [userId, day, "di", food]);
       }
     }
 
-    // save exercise
+    // 3. Save Exercise
     for (const day in exercisePlan) {
       for (const ex of exercisePlan[day]) {
-        await db.query(
-          "INSERT INTO exercise (user_id, day, exercise) VALUES ($1,$2,$3)",
-          [userId, day, ex],
-        );
+        await db.query("INSERT INTO exercise (user_id, day, exercise) VALUES ($1,$2,$3)", [userId, day, ex]);
       }
     }
 
-    // save sleep
-    await db.query("INSERT INTO sleep (user_id, sleep_hour) VALUES ($1,$2)", [
-      userId,
-      minimumSleepHours,
-    ]);
+    // 4. Save Sleep
+    await db.query("INSERT INTO sleep (user_id, sleep_hour) VALUES ($1,$2)", [userId, minimumSleepHours]);
 
-    // save water
-    await db.query("INSERT INTO water (user_id, water) VALUES ($1,$2)", [
-      userId,
-      waterIntakePerDay,
-    ]);
+    // 5. Save Water (Keeping your simple text version for now!)
+    await db.query("INSERT INTO water (user_id, water) VALUES ($1,$2)", [userId, waterIntakePerDay]);
 
-    // update data and analysis_date
-    await db.query(
-      "UPDATE users SET data = 1, analysis_date = NOW() WHERE id = $1",
-      [userId],
-    );
+    // 6. Update data and analysis_date
+    await db.query("UPDATE users SET data = 1, analysis_date = NOW() WHERE id = $1", [userId]);
 
     res.json({ message: "Tracker saved successfully" });
   } catch (error) {
@@ -466,6 +449,9 @@ app.post("/save-tracker", async (req, res) => {
   }
 });
 
+// DO NOT TOUCH your deleteExpiredData() function below this! Keep it right here.
+// async function deleteExpiredData() { ... }
+      
 async function deleteExpiredData() {
   try {
     const result = await db.query(

@@ -47,8 +47,8 @@ export default function ChatBot({ isOpen, onClose }) {
       const genAI = new GoogleGenerativeAI(API_KEY);
       
       // 1. We moved the systemInstruction up here into the model!
-      const model = genAI.getGenerativeModel({ 
-        model: "gemini-2.0-flash",
+      const model = genAI.getGenerativeModel({
+        model: "gemini-3-flash-preview",
         systemInstruction: "You are BeFit Assistant, a friendly and knowledgeable health and fitness AI. You help users understand their blood reports, suggest workout plans, provide nutrition advice, and answer general health questions. Keep responses concise, helpful, and easy to understand. Always remind users to consult healthcare professionals for serious medical concerns."
       });
 
