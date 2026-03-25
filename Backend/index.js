@@ -180,11 +180,6 @@ const upload = multer({ dest: "uploads/" });
 const genAI = new GoogleGenerativeAI(process.env.APIKey);
 const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
 
-app.get("/profile",async(req,res)=>{
-  let result = await db.query("select * from users where userid=$1",[req.userid]);
-
-});
-
 /* BLOOD EXTRACTION PROMPT*/
 const BLOOD_PROMPT = `
 You are an AI blood test report analyzer.
