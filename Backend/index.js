@@ -24,9 +24,13 @@ app.use(express.urlencoded({ extended: true }));
 // Teammate's secure CORS settings for React and Passport
 app.use(
   cors({
-    origin: ["http://localhost:3000", "http://localhost:3003", "http://localhost:3005"],
+    origin: [
+      "http://localhost:3000",
+      "http://localhost:3003",
+      "http://localhost:3005",
+    ],
     credentials: true,
-  })
+  }),
 );
 
 app.use(
@@ -37,7 +41,7 @@ app.use(
     cookie: {
       maxAge: 1000 * 60 * 60 * 24,
     },
-  })
+  }),
 );
 
 app.use(passport.initialize());
@@ -57,7 +61,10 @@ db.query("SELECT 1")
   .catch((err) => console.error("❌ DB connection error:", err.stack));
 
 // Connect to Twilio
-const twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+const twilioClient = twilio(
+  process.env.TWILIO_ACCOUNT_SID,
+  process.env.TWILIO_AUTH_TOKEN,
+);
 
 // Teammate's Secure Signup Route
 app.post("/signup", async (req, res) => {
@@ -67,8 +74,10 @@ app.post("/signup", async (req, res) => {
     let password = req.body.password;
     let dob = req.body.dob;
     let whatsapp = req.body.whatsapp;
+    let sex = req.body.sex;
+    let food = req.body.food;
     let result = await db.query("select * from users where email=$1", [email]);
-    
+
     if (result.rows.length === 0) {
       bcrypt.hash(password, saltRounds, async (err, hash) => {
         if (err) {
@@ -76,8 +85,8 @@ app.post("/signup", async (req, res) => {
           res.status(500).json({ message: "Signup failed" });
         } else {
           const insertResult = await db.query(
-            "INSERT INTO users (name, email, password, dob, whatsapp_number) VALUES ($1, $2, $3, $4, $5) RETURNING *",
-            [name, email, hash, dob, whatsapp],
+            "INSERT INTO users (name, email, password, dob, whatsapp_number,sex,food) VALUES ($1, $2, $3, $4, $5,$6,$7) RETURNING *",
+            [name, email, hash, dob, whatsapp, sex, food],
           );
 
           const user = insertResult.rows[0];
@@ -170,6 +179,11 @@ const upload = multer({ dest: "uploads/" });
 // Generative AI Connection
 const genAI = new GoogleGenerativeAI(process.env.APIKey);
 const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
+
+app.get("/profile",async(req,res)=>{
+  let result = await db.query("select * from users where userid=$1",[req.userid]);
+
+});
 
 /* BLOOD EXTRACTION PROMPT*/
 const BLOOD_PROMPT = `
@@ -401,7 +415,7 @@ Medications: ${req.body.medicines}
 
 app.post("/save-tracker", async (req, res) => {
   console.log("🚪 Someone knocked on the /save-tracker door!"); // <-- ADD THIS
-  
+
   try {
     if (!req.isAuthenticated()) {
       console.log("❌ Blocked! User is not logged in (Session wiped)."); // <-- ADD THIS
@@ -461,13 +475,22 @@ app.post("/save-tracker", async (req, res) => {
     }
 
     // 4. Save Sleep
-    await db.query("INSERT INTO sleep (user_id, sleep_hour) VALUES ($1,$2)", [userId, minimumSleepHours]);
+    await db.query("INSERT INTO sleep (user_id, sleep_hour) VALUES ($1,$2)", [
+      userId,
+      minimumSleepHours,
+    ]);
 
     // 5. Save Water (Keeping your simple text version for now!)
-    await db.query("INSERT INTO water (user_id, water) VALUES ($1,$2)", [userId, waterIntakePerDay]);
+    await db.query("INSERT INTO water (user_id, water) VALUES ($1,$2)", [
+      userId,
+      waterIntakePerDay,
+    ]);
 
     // 6. Update data and analysis_date
-    await db.query("UPDATE users SET data = 1, analysis_date = NOW() WHERE id = $1", [userId]);
+    await db.query(
+      "UPDATE users SET data = 1, analysis_date = NOW() WHERE id = $1",
+      [userId],
+    );
 
     res.json({ message: "Tracker saved successfully" });
   } catch (error) {
@@ -478,7 +501,7 @@ app.post("/save-tracker", async (req, res) => {
 
 // DO NOT TOUCH your deleteExpiredData() function below this! Keep it right here.
 // async function deleteExpiredData() { ... }
-      
+
 async function deleteExpiredData() {
   try {
     const result = await db.query(
@@ -513,24 +536,36 @@ app.get("/get-tracker", async (req, res) => {
     const userId = req.user.id;
 
     // check data flag first
-    const userResult = await db.query("SELECT data FROM users WHERE id=$1", [userId]);
+    const userResult = await db.query("SELECT data FROM users WHERE id=$1", [
+      userId,
+    ]);
     const user = userResult.rows[0];
 
     if (!user || user.data === 0) {
       return res.json({ hasData: false });
     }
 
-    const diet     = await db.query("SELECT * FROM diet WHERE user_id=$1", [userId]);
-    const exercise = await db.query("SELECT * FROM exercise WHERE user_id=$1", [userId]);
-    const sleep    = await db.query("SELECT * FROM sleep WHERE user_id=$1 ORDER BY id DESC LIMIT 1", [userId]);
-    const water    = await db.query("SELECT * FROM water WHERE user_id=$1 ORDER BY id DESC LIMIT 1", [userId]);
+    const diet = await db.query("SELECT * FROM diet WHERE user_id=$1", [
+      userId,
+    ]);
+    const exercise = await db.query("SELECT * FROM exercise WHERE user_id=$1", [
+      userId,
+    ]);
+    const sleep = await db.query(
+      "SELECT * FROM sleep WHERE user_id=$1 ORDER BY id DESC LIMIT 1",
+      [userId],
+    );
+    const water = await db.query(
+      "SELECT * FROM water WHERE user_id=$1 ORDER BY id DESC LIMIT 1",
+      [userId],
+    );
 
     res.json({
-      hasData:  true,
-      diet:     diet.rows,
+      hasData: true,
+      diet: diet.rows,
       exercise: exercise.rows,
-      sleep:    sleep.rows[0] || null,
-      water:    water.rows[0] || null,
+      sleep: sleep.rows[0] || null,
+      water: water.rows[0] || null,
     });
   } catch (error) {
     console.error(error);
