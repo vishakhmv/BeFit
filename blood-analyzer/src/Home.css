@@ -168,8 +168,11 @@
   border-radius: 10px;
   padding: 15px;
   box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+
+  /* --- THE UNIFORM HEIGHT FIX --- */
   display: flex;
   flex-direction: column;
+  height: 100%; /* Forces the card to stretch to match the tallest card in its row */
 }
 
 .card-header {
