@@ -4,7 +4,7 @@ import "./ChatBot.css";
 
 const API_KEY = process.env.REACT_APP_GEMINI_API_KEY;
 
-export default function ChatBot({ isOpen, onClose }) {
+export default function ChatBot({ isOpen, onClose, reportData }) {
   const [messages, setMessages] = useState([
     {
       role: "bot",
@@ -45,11 +45,21 @@ export default function ChatBot({ isOpen, onClose }) {
 
     try {
       const genAI = new GoogleGenerativeAI(API_KEY);
+
+      let systemInstruction =
+        "You are BeFit Assistant, a friendly and knowledgeable health and fitness AI. You help users understand their blood reports, suggest workout plans, provide nutrition advice, and answer general health questions. Keep responses concise, helpful, and easy to understand. Always remind users to consult healthcare professionals for serious medical concerns.";
+
+      if (reportData?.results?.length) {
+        const reportSummary = reportData.results
+          .map((r) => `${r.name}: ${r.value} (${r.status})`)
+          .join(", ");
+
+        systemInstruction += `\n\nThe user has already uploaded a blood report in this app. Use this exact report data when answering report-related questions: ${reportSummary}. Do not say you don't have access to the report unless the user asks outside this uploaded data.`;
+      }
       
-      // 1. We moved the systemInstruction up here into the model!
       const model = genAI.getGenerativeModel({
         model: "gemini-3-flash-preview",
-        systemInstruction: "You are BeFit Assistant, a friendly and knowledgeable health and fitness AI. You help users understand their blood reports, suggest workout plans, provide nutrition advice, and answer general health questions. Keep responses concise, helpful, and easy to understand. Always remind users to consult healthcare professionals for serious medical concerns."
+        systemInstruction,
       });
 
       // Build conversation history for context (keeping our .slice(1) fix!)

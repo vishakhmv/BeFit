@@ -24,9 +24,13 @@ app.use(express.urlencoded({ extended: true }));
 // Teammate's secure CORS settings for React and Passport
 app.use(
   cors({
-    origin: ["http://localhost:3000", "http://localhost:3003", "http://localhost:3005"],
+    origin: [
+      "http://localhost:3000",
+      "http://localhost:3003",
+      "http://localhost:3005",
+    ],
     credentials: true,
-  })
+  }),
 );
 
 app.use(
@@ -37,14 +41,14 @@ app.use(
     cookie: {
       maxAge: 1000 * 60 * 60 * 24,
     },
-  })
+  }),
 );
 
 app.use(passport.initialize());
 app.use(passport.session());
 
-// YOUR secure database connection
-const db = new pg.Client({
+// Use a pool so concurrent API/cron queries are safe.
+const db = new pg.Pool({
   user: process.env.DB_USER,
   host: process.env.DB_HOST,
   database: process.env.DB_NAME,
@@ -52,12 +56,15 @@ const db = new pg.Client({
   port: process.env.DB_PORT,
 });
 
-db.connect()
+db.query("SELECT 1")
   .then(() => console.log("✅ Connected to BeFit DB securely!"))
   .catch((err) => console.error("❌ DB connection error:", err.stack));
 
 // Connect to Twilio
-const twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+const twilioClient = twilio(
+  process.env.TWILIO_ACCOUNT_SID,
+  process.env.TWILIO_AUTH_TOKEN,
+);
 
 // Teammate's Secure Signup Route
 app.post("/signup", async (req, res) => {
@@ -67,8 +74,10 @@ app.post("/signup", async (req, res) => {
     let password = req.body.password;
     let dob = req.body.dob;
     let whatsapp = req.body.whatsapp;
+    let sex = req.body.sex;
+    let food = req.body.food;
     let result = await db.query("select * from users where email=$1", [email]);
-    
+
     if (result.rows.length === 0) {
       bcrypt.hash(password, saltRounds, async (err, hash) => {
         if (err) {
@@ -76,8 +85,8 @@ app.post("/signup", async (req, res) => {
           res.status(500).json({ message: "Signup failed" });
         } else {
           const insertResult = await db.query(
-            "INSERT INTO users (name, email, password, dob, whatsapp_number) VALUES ($1, $2, $3, $4, $5) RETURNING *",
-            [name, email, hash, dob, whatsapp],
+            "INSERT INTO users (name, email, password, dob, whatsapp_number,sex,food) VALUES ($1, $2, $3, $4, $5,$6,$7) RETURNING *",
+            [name, email, hash, dob, whatsapp, sex, food],
           );
 
           const user = insertResult.rows[0];
@@ -178,31 +187,26 @@ You are an AI blood test report analyzer.
 The user will upload an image of a blood test report along with personal details.
 
 User Details Provided:
-
 * Age
+* Gender
 * Height
 * Weight
+* Current medications
 
 IMPORTANT RULES:
-
 1. Use the user details to personalize recommendations.
 2. Do NOT repeat the user's personal details in the output.
 3. Do NOT diagnose diseases.
 4. If any parameter is LOW or HIGH, clearly state that the user should consult a doctor.
 5. Keep the analysis simple and easy to understand.
-6. "overall summary" must clearly explain the full report with major findings.
 
-ANTI-HALLUCINATION RULES:
-
+ANTI-HALLUCINATION & EVALUATION RULES:
 1. Extract ONLY visible parameters.
-2. NEVER guess or assume values.
-3. If ANY value is unclear → RETURN ERROR.
-4. Do NOT add extra parameters.
-5. Copy values exactly with units.
-6. If image is unclear → RETURN ERROR.
+2. NEVER guess or assume the patient's actual test values.
+3. EXCEPTION TO RULE 2 (MISSING RANGES): If the physical report does NOT provide a reference range for a specific parameter, you MUST use standard global medical reference ranges to evaluate if the status is LOW, NORMAL, or HIGH. Only use UNKNOWN if the parameter name itself is completely illegible.
+4. Copy values exactly with units.
 
 ERROR RESPONSE:
-
 {
 "error": "Unable to reliably analyze the blood test report image"
 }
@@ -210,12 +214,11 @@ ERROR RESPONSE:
 If error → STOP.
 
 TASK:
-
 Extract ALL visible blood parameters.
 
 For EACH parameter return:
-
-* name
+* extractedName (Copy exactly what is written on the report, e.g., "Hct" or "RDW-CV")
+* expandedName (The full medical name. e.g., "Hematocrit (Hct)". If it is already a full name, just copy it.)
 * value (with unit)
 * status (LOW / NORMAL / HIGH / UNKNOWN)
 * issues
@@ -225,64 +228,74 @@ For EACH parameter return:
 * whatIfHigh
 
 RULES:
-
 1. If status = LOW:
-
-- issues → simple meaning
-- whyItHappens → common causes
-- summary → explain value + LOW meaning
+ - issues → simple meaning of the low result
+ - whyItHappens → common causes for this low result
+ - summary → A simple, 1-2 sentence educational definition of what this blood parameter actually measures in the human body.
 - whatIfLow → explain what LOW means for this parameter
 - whatIfHigh → explain what HIGH would mean for this parameter
 
 2. If status = HIGH:
-
-- issues → simple meaning
-- whyItHappens → common causes
-- summary → explain value + HIGH meaning
+ - issues → simple meaning of the high result
+ - whyItHappens → common causes for this high result
+ - summary → A simple, 1-2 sentence educational definition of what this blood parameter actually measures in the human body.
 - whatIfLow → explain what LOW would mean for this parameter
 - whatIfHigh → explain what HIGH means for this parameter
 
 3. If status = NORMAL:
-
 - issues = "none"
 - whyItHappens = "none"
-- summary = "This parameter is within the normal range."
+- summary → A simple, 1-2 sentence educational definition of what this blood parameter actually measures in the human body.
 - whatIfLow → explain what LOW would mean for this parameter
 - whatIfHigh → explain what HIGH would mean for this parameter
 
 4. If status = UNKNOWN:
-
 - issues = "unclear"
 - whyItHappens = "unclear"
-- summary = "Unable to determine the status."
+- summary → A simple, 1-2 sentence educational definition of what this blood parameter actually measures in the human body.
 - whatIfLow → general explanation if low
 - whatIfHigh → general explanation if high
 
+EXECUTIVE SUMMARY REQUIREMENTS:
+Generate a holistic action plan based on the abnormal values found.
+1. futureOutlook: A brief, motivating intro on how fixing these specific abnormal values will improve their life and future health.
+2. keyFocusAreas: An array of the top 2-3 medical issues to focus on.
+3. dietaryFocus: Specific food advice to correct the abnormal values.
+4. estimatedCalories: An estimated daily calorie goal based on their height, weight, age, and gender.
+5. estimatedProtein: An estimated daily protein goal (in grams) based on their weight.
+6. lifestyleAdvice: Specific exercise and sleep adjustments needed for their specific blood results.
+
 DIET PLAN:
+Create a healthy weekly diet plan personalized for the user.
+Rules:
+1. Diet must be UNIQUE for each day.
+2. Each day must include: breakfast, lunch, snacks, dinner.
+3. Each meal must be an ARRAY of food suggestions.
 
-- 7 days (Monday-Sunday)
-- Each day: breakfast, lunch, snacks, dinner
-- Each meal = ARRAY
-- Keep it simple
+EXERCISE PLAN REQUIREMENTS:
+1. Provide a weekly exercise plan.
+2. Each day must contain an ARRAY of exercises.
 
-EXERCISE PLAN:
-
-- 7 days
-- Each day = ARRAY
-
-ALSO INCLUDE:
-
-- waterIntakePerDay (based on weight)
-- minimumSleepHours (based on age)
+Also provide:
+* waterIntakePerDay (based on user's weight)
+* minimumSleepHours (recommended minimum hours of sleep per night based on age)
 
 OUTPUT STRICT JSON ONLY.
 
-FORMAT:
-
+OUTPUT FORMAT:
 {
+"executiveSummary": {
+  "futureOutlook": "",
+  "keyFocusAreas": [],
+  "dietaryFocus": "",
+  "estimatedCalories": "",
+  "estimatedProtein": "",
+  "lifestyleAdvice": ""
+},
 "results": [
 {
-"name": "",
+"extractedName": "",
+"expandedName": "",
 "value": "",
 "status": "",
 "issues": "",
@@ -292,34 +305,22 @@ FORMAT:
 "whatIfHigh": ""
 }
 ],
-
 "dietPlan": {
-"monday": {"breakfast": [],"lunch": [],"snacks": [],"dinner": []},
-"tuesday": {"breakfast": [],"lunch": [],"snacks": [],"dinner": []},
-"wednesday": {"breakfast": [],"lunch": [],"snacks": [],"dinner": []},
-"thursday": {"breakfast": [],"lunch": [],"snacks": [],"dinner": []},
-"friday": {"breakfast": [],"lunch": [],"snacks": [],"dinner": []},
-"saturday": {"breakfast": [],"lunch": [],"snacks": [],"dinner": []},
-"sunday": {"breakfast": [],"lunch": [],"snacks": [],"dinner": []}
+"monday": { "breakfast": [], "lunch": [], "snacks": [], "dinner": [] },
+"tuesday": { "breakfast": [], "lunch": [], "snacks": [], "dinner": [] },
+"wednesday": { "breakfast": [], "lunch": [], "snacks": [], "dinner": [] },
+"thursday": { "breakfast": [], "lunch": [], "snacks": [], "dinner": [] },
+"friday": { "breakfast": [], "lunch": [], "snacks": [], "dinner": [] },
+"saturday": { "breakfast": [], "lunch": [], "snacks": [], "dinner": [] },
+"sunday": { "breakfast": [], "lunch": [], "snacks": [], "dinner": [] }
 },
-
 "exercisePlan": {
-"monday": [],
-"tuesday": [],
-"wednesday": [],
-"thursday": [],
-"friday": [],
-"saturday": [],
-"sunday": []
+"monday": [], "tuesday": [], "wednesday": [], "thursday": [], "friday": [], "saturday": [], "sunday": []
 },
-
 "waterIntakePerDay": "",
-"minimumSleepHours": "",
-"overall summary": ""
+"minimumSleepHours": ""
 }
 `;
-
-console.log(BLOOD_PROMPT);
 
 app.post("/analyze", upload.single("report"), async (req, res) => {
   let imagePath;
@@ -351,6 +352,47 @@ Medications: ${req.body.medicines}
     const aiResponse = result.response.text();
     const clean = aiResponse.replace(/```json|```/g, "");
     const parsed = JSON.parse(clean);
+
+    if (Array.isArray(parsed.results)) {
+      parsed.results = parsed.results.map((item = {}) => {
+        const status = (item.status || "UNKNOWN").toUpperCase();
+        const expandedName =
+          typeof item.expandedName === "string" && item.expandedName.trim()
+            ? item.expandedName.trim()
+            : "";
+        const extractedName =
+          typeof item.extractedName === "string" && item.extractedName.trim()
+            ? item.extractedName.trim()
+            : "";
+        const fallbackName =
+          typeof item.name === "string" && item.name.trim() ? item.name.trim() : "";
+        const normalizedName = expandedName || fallbackName || extractedName || "Unknown Parameter";
+
+        return {
+          ...item,
+          extractedName: extractedName || fallbackName || normalizedName,
+          expandedName: expandedName || fallbackName || extractedName || normalizedName,
+          name: normalizedName,
+          summary:
+            typeof item.summary === "string" && item.summary.trim()
+              ? item.summary
+              : "Summary not available.",
+          whatIfLow:
+            typeof item.whatIfLow === "string" && item.whatIfLow.trim()
+              ? item.whatIfLow
+              : status === "LOW"
+                ? "Already low in this report."
+                : "If this parameter becomes low, consult a doctor for evaluation.",
+          whatIfHigh:
+            typeof item.whatIfHigh === "string" && item.whatIfHigh.trim()
+              ? item.whatIfHigh
+              : status === "HIGH"
+                ? "Already high in this report."
+                : "If this parameter becomes high, consult a doctor for evaluation.",
+        };
+      });
+    }
+
     if (parsed.error) {
       fs.unlinkSync(imagePath);
       return res.status(400).json(parsed);
@@ -368,7 +410,7 @@ Medications: ${req.body.medicines}
 
 app.post("/save-tracker", async (req, res) => {
   console.log("🚪 Someone knocked on the /save-tracker door!"); // <-- ADD THIS
-  
+
   try {
     if (!req.isAuthenticated()) {
       console.log("❌ Blocked! User is not logged in (Session wiped)."); // <-- ADD THIS
@@ -377,7 +419,19 @@ app.post("/save-tracker", async (req, res) => {
 
     console.log("🔓 User is authenticated. Saving data..."); // <-- ADD THIS
     const userId = req.user.id;
-    const { dietPlan, exercisePlan, waterIntakePerDay, minimumSleepHours } = req.body;
+    const dayOrder = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+    const rawDietPlan = req.body?.dietPlan && typeof req.body.dietPlan === "object" ? req.body.dietPlan : {};
+    const rawExercisePlan = req.body?.exercisePlan && typeof req.body.exercisePlan === "object" ? req.body.exercisePlan : {};
+    const waterIntakePerDay = req.body?.waterIntakePerDay || "2-3 liters/day";
+    const minimumSleepHours = req.body?.minimumSleepHours || "7-8";
+
+    // Normalize day keys so TodoTracker (which expects lowercase days) always matches.
+    const dietPlan = Object.fromEntries(
+      Object.entries(rawDietPlan).map(([day, meals]) => [String(day).toLowerCase(), meals]),
+    );
+    const exercisePlan = Object.fromEntries(
+      Object.entries(rawExercisePlan).map(([day, exercises]) => [String(day).toLowerCase(), exercises]),
+    );
 
     // 1. CLEANUP: Delete old plans so we don't spam the Todo Tracker
     await db.query("DELETE FROM diet WHERE user_id=$1", [userId]);
@@ -386,38 +440,52 @@ app.post("/save-tracker", async (req, res) => {
     await db.query("DELETE FROM water WHERE user_id=$1", [userId]);
 
     // 2. Save Diet (The infinite fetch loop has been removed from here)
-    for (const day in dietPlan) {
-      const meals = dietPlan[day];
+    for (const day of dayOrder) {
+      const meals = dietPlan[day] || {};
+      const breakfasts = Array.isArray(meals.breakfast) ? meals.breakfast : [];
+      const lunches = Array.isArray(meals.lunch) ? meals.lunch : [];
+      const snacks = Array.isArray(meals.snacks) ? meals.snacks : [];
+      const dinners = Array.isArray(meals.dinner) ? meals.dinner : [];
 
-      for (const food of meals.breakfast) {
+      for (const food of breakfasts) {
         await db.query("INSERT INTO diet (user_id, day, meal_time, food) VALUES ($1,$2,$3,$4)", [userId, day, "bf", food]);
       }
-      for (const food of meals.lunch) {
+      for (const food of lunches) {
         await db.query("INSERT INTO diet (user_id, day, meal_time, food) VALUES ($1,$2,$3,$4)", [userId, day, "lu", food]);
       }
-      for (const food of meals.snacks) {
+      for (const food of snacks) {
         await db.query("INSERT INTO diet (user_id, day, meal_time, food) VALUES ($1,$2,$3,$4)", [userId, day, "sn", food]);
       }
-      for (const food of meals.dinner) {
+      for (const food of dinners) {
         await db.query("INSERT INTO diet (user_id, day, meal_time, food) VALUES ($1,$2,$3,$4)", [userId, day, "di", food]);
       }
     }
 
     // 3. Save Exercise
-    for (const day in exercisePlan) {
-      for (const ex of exercisePlan[day]) {
+    for (const day of dayOrder) {
+      const dayExercises = Array.isArray(exercisePlan[day]) ? exercisePlan[day] : [];
+      for (const ex of dayExercises) {
         await db.query("INSERT INTO exercise (user_id, day, exercise) VALUES ($1,$2,$3)", [userId, day, ex]);
       }
     }
 
     // 4. Save Sleep
-    await db.query("INSERT INTO sleep (user_id, sleep_hour) VALUES ($1,$2)", [userId, minimumSleepHours]);
+    await db.query("INSERT INTO sleep (user_id, sleep_hour) VALUES ($1,$2)", [
+      userId,
+      minimumSleepHours,
+    ]);
 
     // 5. Save Water (Keeping your simple text version for now!)
-    await db.query("INSERT INTO water (user_id, water) VALUES ($1,$2)", [userId, waterIntakePerDay]);
+    await db.query("INSERT INTO water (user_id, water) VALUES ($1,$2)", [
+      userId,
+      waterIntakePerDay,
+    ]);
 
     // 6. Update data and analysis_date
-    await db.query("UPDATE users SET data = 1, analysis_date = NOW() WHERE id = $1", [userId]);
+    await db.query(
+      "UPDATE users SET data = 1, analysis_date = NOW() WHERE id = $1",
+      [userId],
+    );
 
     res.json({ message: "Tracker saved successfully" });
   } catch (error) {
@@ -428,7 +496,7 @@ app.post("/save-tracker", async (req, res) => {
 
 // DO NOT TOUCH your deleteExpiredData() function below this! Keep it right here.
 // async function deleteExpiredData() { ... }
-      
+
 async function deleteExpiredData() {
   try {
     const result = await db.query(
@@ -463,24 +531,36 @@ app.get("/get-tracker", async (req, res) => {
     const userId = req.user.id;
 
     // check data flag first
-    const userResult = await db.query("SELECT data FROM users WHERE id=$1", [userId]);
+    const userResult = await db.query("SELECT data FROM users WHERE id=$1", [
+      userId,
+    ]);
     const user = userResult.rows[0];
 
     if (!user || user.data === 0) {
       return res.json({ hasData: false });
     }
 
-    const diet     = await db.query("SELECT * FROM diet WHERE user_id=$1", [userId]);
-    const exercise = await db.query("SELECT * FROM exercise WHERE user_id=$1", [userId]);
-    const sleep    = await db.query("SELECT * FROM sleep WHERE user_id=$1 ORDER BY id DESC LIMIT 1", [userId]);
-    const water    = await db.query("SELECT * FROM water WHERE user_id=$1 ORDER BY id DESC LIMIT 1", [userId]);
+    const diet = await db.query("SELECT * FROM diet WHERE user_id=$1", [
+      userId,
+    ]);
+    const exercise = await db.query("SELECT * FROM exercise WHERE user_id=$1", [
+      userId,
+    ]);
+    const sleep = await db.query(
+      "SELECT * FROM sleep WHERE user_id=$1 ORDER BY id DESC LIMIT 1",
+      [userId],
+    );
+    const water = await db.query(
+      "SELECT * FROM water WHERE user_id=$1 ORDER BY id DESC LIMIT 1",
+      [userId],
+    );
 
     res.json({
-      hasData:  true,
-      diet:     diet.rows,
+      hasData: true,
+      diet: diet.rows,
       exercise: exercise.rows,
-      sleep:    sleep.rows[0] || null,
-      water:    water.rows[0] || null,
+      sleep: sleep.rows[0] || null,
+      water: water.rows[0] || null,
     });
   } catch (error) {
     console.error(error);
@@ -488,37 +568,316 @@ app.get("/get-tracker", async (req, res) => {
   }
 });
 
-// THE TWILIO ALARM CLOCK (Runs every day at 9 AM)
-cron.schedule("0 9 * * *", async () => {
-  try {
-    console.log("⏰ Alarm Clock waking up to check for reminders...");
+// ==========================================
+// TWILIO WHATSAPP BOT: THE DAILY COACH
+// ==========================================
 
-    // 1. Find all users who have uploaded a report (data = 1) and get their water goal
-    const result = await db.query(`
-      SELECT users.name, users.whatsapp_number, water.water
-      FROM users
-      JOIN water ON users.id = water.user_id
-      WHERE users.data = 1
-    `);
+// Helper function to get today's day in lowercase (e.g., "monday")
+const getTodayName = () => {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Kolkata",
+    weekday: "long",
+  })
+    .format(new Date())
+    .toLowerCase();
+};
 
-    // 2. Loop through every user we found
-    for (const user of result.rows) {
-      if (user.whatsapp_number) {
-        
-        // 3. Send them a personalized WhatsApp message
-        await twilioClient.messages.create({
-          body: `Hello ${user.name}! 💧 This is your BeFit reminder to drink your ${user.water} of water today! Keep up the great work.`,
-          from: "whatsapp:+14155238886", // Hardcoded to guarantee the channel matches!
-          to: "whatsapp:" + user.whatsapp_number 
-        });
-        
-        console.log(`✅ WhatsApp sent to ${user.name}`);
-      }
+const formatList = (items, fallback) => {
+  if (!Array.isArray(items) || items.length === 0) return fallback;
+  return items.join(", ");
+};
+
+const getUsersWithWhatsapp = async () => {
+  const users = await db.query(
+    "SELECT id, name, whatsapp_number FROM users WHERE whatsapp_number IS NOT NULL AND data = 1"
+  );
+  return users.rows;
+};
+
+const getDailyPlanForUser = async (userId, day) => {
+  const [dietRows, exerciseRows, waterRow, sleepRow] = await Promise.all([
+    db.query("SELECT meal_time, food FROM diet WHERE user_id=$1 AND day=$2", [userId, day]),
+    db.query("SELECT exercise FROM exercise WHERE user_id=$1 AND day=$2", [userId, day]),
+    db.query("SELECT water FROM water WHERE user_id=$1 ORDER BY id DESC LIMIT 1", [userId]),
+    db.query("SELECT sleep_hour FROM sleep WHERE user_id=$1 ORDER BY id DESC LIMIT 1", [userId]),
+  ]);
+
+  const meals = { bf: [], lu: [], sn: [], di: [] };
+  for (const row of dietRows.rows) {
+    if (row.meal_time && meals[row.meal_time]) {
+      meals[row.meal_time].push(row.food);
     }
-  } catch (error) {
-    console.error("❌ Twilio Cron Error:", error);
   }
-});
+
+  return {
+    breakfast: meals.bf,
+    lunch: meals.lu,
+    snacks: meals.sn,
+    dinner: meals.di,
+    exercises: exerciseRows.rows.map((r) => r.exercise),
+    water: waterRow.rows[0]?.water || "plenty of water",
+    sleep: sleepRow.rows[0]?.sleep_hour || "7-8 hours",
+  };
+};
+
+// In-process guard: prevents duplicate sends for the same user/slot/day.
+const sentReminderKeys = new Set();
+
+const getTodayISODateInIST = () => {
+  const now = new Date();
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+};
+
+const hasAlreadySentForSlot = (userId, slotName) => {
+  const key = `${getTodayISODateInIST()}:${slotName}:${userId}`;
+  if (sentReminderKeys.has(key)) return true;
+  sentReminderKeys.add(key);
+  return false;
+};
+
+const getISTHour = () => {
+  return Number(
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Kolkata",
+      hour: "2-digit",
+      hour12: false,
+    }).format(new Date())
+  );
+};
+
+const isWithinHourWindowIST = (startHourInclusive, endHourExclusive) => {
+  const hour = getISTHour();
+  return hour >= startHourInclusive && hour < endHourExclusive;
+};
+
+const isWithinBreakfastWindowIST = () => isWithinHourWindowIST(8, 10);
+
+const isWithinLunchWindowIST = () => {
+  return isWithinHourWindowIST(12, 14);
+};
+
+const isWithinEveningWindowIST = () => isWithinHourWindowIST(17, 19);
+
+const isWithinNightWindowIST = () => isWithinHourWindowIST(20, 22);
+
+const sendBreakfastReminders = async (source = "cron") => {
+  const today = getTodayName();
+  const users = await getUsersWithWhatsapp();
+  let sentCount = 0;
+
+  for (const user of users) {
+    if (hasAlreadySentForSlot(user.id, "breakfast")) continue;
+
+    const plan = await getDailyPlanForUser(user.id, today);
+    if (plan.breakfast.length === 0 && plan.exercises.length === 0) continue;
+
+    const breakfast = formatList(plan.breakfast, "A balanced breakfast");
+    const gym = formatList(plan.exercises, "Light activity and stretching");
+
+    const msg = `Good morning BeFit Champion!\n\nBreakfast: ${breakfast}\n\nWorkout Goal: ${gym}\n\nHydration: Start your day right with a glass of water. (Goal: ${plan.water})`;
+    await twilioClient.messages.create({
+      from: "whatsapp:+14155238886",
+      to: `whatsapp:${user.whatsapp_number}`,
+      body: msg,
+    });
+    sentCount += 1;
+  }
+
+  console.log(`[BREAKFAST ${source.toUpperCase()}] Sent reminders: ${sentCount}`);
+};
+
+const sendLunchReminders = async (source = "cron") => {
+  const today = getTodayName();
+  const users = await getUsersWithWhatsapp();
+  let sentCount = 0;
+
+  for (const user of users) {
+    if (hasAlreadySentForSlot(user.id, "lunch")) continue;
+
+    const plan = await getDailyPlanForUser(user.id, today);
+    const lunch = formatList(plan.lunch, "A nutritious lunch plate");
+
+    const msg = `It's lunchtime!\n\nToday's Lunch: ${lunch}\n\nHydration Check: Make sure you are drinking enough to hit your ${plan.water} goal today!`;
+    await twilioClient.messages.create({
+      from: "whatsapp:+14155238886",
+      to: `whatsapp:${user.whatsapp_number}`,
+      body: msg,
+    });
+    sentCount += 1;
+  }
+
+  console.log(`[LUNCH ${source.toUpperCase()}] Sent lunch reminders: ${sentCount}`);
+};
+
+const sendEveningReminders = async (source = "cron") => {
+  const today = getTodayName();
+  const users = await getUsersWithWhatsapp();
+  let sentCount = 0;
+
+  for (const user of users) {
+    if (hasAlreadySentForSlot(user.id, "snacks")) continue;
+
+    const plan = await getDailyPlanForUser(user.id, today);
+    if (plan.snacks.length === 0 && plan.exercises.length === 0) continue;
+
+    const snacks = formatList(plan.snacks, "A healthy protein-rich snack");
+
+    const msg = `Afternoon slump? Time for a snack!\n\nSnack: ${snacks}\n\nGym Check: If you haven't done your workout yet, go crush it!\n\nHydration: Keep sipping! You are on your way to ${plan.water}.`;
+    await twilioClient.messages.create({
+      from: "whatsapp:+14155238886",
+      to: `whatsapp:${user.whatsapp_number}`,
+      body: msg,
+    });
+    sentCount += 1;
+  }
+
+  console.log(`[EVENING ${source.toUpperCase()}] Sent reminders: ${sentCount}`);
+};
+
+const sendNightReminders = async (source = "cron") => {
+  const today = getTodayName();
+  const users = await getUsersWithWhatsapp();
+  let sentCount = 0;
+
+  for (const user of users) {
+    if (hasAlreadySentForSlot(user.id, "dinner")) continue;
+
+    const plan = await getDailyPlanForUser(user.id, today);
+    if (plan.dinner.length === 0) continue;
+
+    const dinner = formatList(plan.dinner, "A light and balanced dinner");
+
+    const msg = `Good evening! Time to refuel.\n\nDinner: ${dinner}\n\nFinal Hydration: Finish up your ${plan.water} goal for the day, but don't drink too much right before bed!`;
+    await twilioClient.messages.create({
+      from: "whatsapp:+14155238886",
+      to: `whatsapp:${user.whatsapp_number}`,
+      body: msg,
+    });
+    sentCount += 1;
+  }
+
+  console.log(`[NIGHT ${source.toUpperCase()}] Sent reminders: ${sentCount}`);
+};
+
+// 1. MORNING (8:00 AM IST) - Breakfast & Gym + Water
+cron.schedule(
+  "0 8 * * *",
+  async () => {
+    try {
+      await sendBreakfastReminders("cron");
+    } catch (err) {
+      console.error("Cron Error:", err);
+    }
+  },
+  { scheduled: true, timezone: "Asia/Kolkata" }
+);
+
+// 2. AFTERNOON (12:00 PM IST) - Lunch + Water
+cron.schedule(
+  "0 12 * * *",
+  async () => {
+    try {
+      await sendLunchReminders("cron");
+    } catch (err) {
+      console.error("Cron Error:", err);
+    }
+  },
+  { scheduled: true, timezone: "Asia/Kolkata" }
+);
+
+const processActiveSlotWindows = async (source = "window-check") => {
+  if (isWithinBreakfastWindowIST()) {
+    await sendBreakfastReminders(source);
+  }
+  if (isWithinLunchWindowIST()) {
+    await sendLunchReminders(source);
+  }
+  if (isWithinEveningWindowIST()) {
+    await sendEveningReminders(source);
+  }
+  if (isWithinNightWindowIST()) {
+    await sendNightReminders(source);
+  }
+};
+
+// Startup catch-up: send for active windows immediately.
+(async () => {
+  try {
+    await processActiveSlotWindows("startup-window");
+  } catch (err) {
+    console.error("Startup Slot Window Error:", err);
+  }
+})();
+
+// Window check every 5 minutes: if backend is running during the slot window,
+// reminders are still sent once (guarded) even if exact minute cron was missed.
+cron.schedule(
+  "*/5 * * * *",
+  async () => {
+    try {
+      await processActiveSlotWindows("window-check");
+    } catch (err) {
+      console.error("Window Check Error:", err);
+    }
+  },
+  { scheduled: true, timezone: "Asia/Kolkata" }
+);
+
+// 3. EVENING (5:00 PM IST) - Snack & Gym Check + Water
+cron.schedule(
+  "0 17 * * *",
+  async () => {
+    try {
+      await sendEveningReminders("cron");
+    } catch (err) {
+      console.error("Cron Error:", err);
+    }
+  },
+  { scheduled: true, timezone: "Asia/Kolkata" }
+);
+
+// 4. NIGHT (8:00 PM IST) - Dinner + Water
+cron.schedule(
+  "0 20 * * *",
+  async () => {
+    try {
+      await sendNightReminders("cron");
+    } catch (err) {
+      console.error("Cron Error:", err);
+    }
+  },
+  { scheduled: true, timezone: "Asia/Kolkata" }
+);
+
+// 5. BEDTIME (10:00 PM IST) - Sleep
+cron.schedule(
+  "0 22 * * *",
+  async () => {
+    try {
+      const users = await getUsersWithWhatsapp();
+
+      for (const user of users) {
+        if (hasAlreadySentForSlot(user.id, "sleep")) continue;
+
+        const plan = await getDailyPlanForUser(user.id, getTodayName());
+        const msg = `Time to wind down.\n\nYour AI plan recommends at least ${plan.sleep} tonight to recover properly.\n\nPut the phone away and get some rest. See you tomorrow!`;
+        await twilioClient.messages.create({
+          from: "whatsapp:+14155238886",
+          to: `whatsapp:${user.whatsapp_number}`,
+          body: msg,
+        });
+      }
+    } catch (err) {
+      console.error("Cron Error:", err);
+    }
+  },
+  { scheduled: true, timezone: "Asia/Kolkata" }
+);
 
 
 app.listen(port, () => {

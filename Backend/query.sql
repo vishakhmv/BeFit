@@ -4,6 +4,8 @@ CREATE TABLE users (
     email VARCHAR(150) UNIQUE NOT NULL,
     password TEXT NOT NULL,
     dob DATE,
+    food VARCHAR(20),
+    sex VARCHAR(20),
     data INT DEFAULT 0,
     analysis_date TIMESTAMP
 );
