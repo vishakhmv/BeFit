@@ -57,8 +57,8 @@ const db = new pg.Pool({
 });
 
 db.query("SELECT 1")
-  .then(() => console.log("✅ Connected to BeFit DB securely!"))
-  .catch((err) => console.error("❌ DB connection error:", err.stack));
+  .then(() => console.log("Connected to BeFit DB securely!"))
+  .catch((err) => console.error("DB connection error:", err.stack));
 
 // Connect to Twilio
 const twilioClient = twilio(
@@ -881,5 +881,5 @@ cron.schedule(
 
 
 app.listen(port, () => {
-  console.log(`🚀 Your app is listening to port ${port}`);
+  console.log(`Your app is listening to port ${port}`);
 });
