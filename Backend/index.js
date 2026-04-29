@@ -218,6 +218,8 @@ User Details Provided:
 * Gender
 * Height
 * Weight
+* State (Location for regional cuisine)
+* Dietary Preference (Veg/Non-Veg)
 
 IMPORTANT RULES:
 1. Use the user details to personalize recommendations.
@@ -286,7 +288,7 @@ EXECUTIVE SUMMARY REQUIREMENTS:
 Generate a holistic action plan based on the abnormal values found.
 1. futureOutlook: A brief, motivating intro on how fixing these specific abnormal values will improve their life and future health.
 2. keyFocusAreas: An array of the top 2-3 medical issues to focus on.
-3. dietaryFocus: Specific food advice to correct the abnormal values.
+3. dietaryFocus: Specific food advice to correct the abnormal values. This MUST strictly align with the user's Dietary Preference (Veg/Non-Veg) and highlight accessible regional dishes popular in their State.
 4. estimatedCalories: An estimated daily calorie goal based on their height, weight, age, and gender.
 5. estimatedProtein: An estimated daily protein goal (in grams) based on their weight.
 6. lifestyleAdvice: Specific exercise and sleep adjustments needed for their specific blood results.
@@ -297,6 +299,8 @@ Rules:
 1. Diet must be UNIQUE for each day.
 2. Each day must include: breakfast, lunch, snacks, dinner.
 3. Each meal must be an ARRAY of food suggestions.
+4. CRITICAL: All food suggestions MUST strictly match the user's Dietary Preference (Veg/Non-Veg).
+5. CRITICAL: The meals must heavily feature local, practical, and traditional cuisine based on the user's State.
 
 EXERCISE PLAN REQUIREMENTS:
 1. Provide a weekly exercise plan.
