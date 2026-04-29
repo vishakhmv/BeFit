@@ -76,6 +76,33 @@ app.post("/signup", async (req, res) => {
     let whatsapp = req.body.whatsapp;
     let sex = req.body.sex;
     let food = req.body.food;
+    let state = req.body.state;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: "Invalid email format" });
+    }
+
+    // 2. Validate WhatsApp Number (Must be exactly 10 digits)
+    const phoneRegex = /^\d{10}$/;
+    if (!phoneRegex.test(whatsapp)) {
+      return res
+        .status(400)
+        .json({ message: "WhatsApp number must be exactly 10 digits" });
+    }
+
+    // 3. Validate Date of Birth (Must be a valid date and NOT in the future)
+    const dobDate = new Date(dob);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (isNaN(dobDate.getTime())) {
+      return res.status(400).json({ message: "Invalid Date of Birth" });
+    }
+    if (dobDate >= today) {
+      return res
+        .status(400)
+        .json({ message: "Date of Birth cannot be a future date or today" });
+    }
     let result = await db.query("select * from users where email=$1", [email]);
 
     if (result.rows.length === 0) {
@@ -85,8 +112,8 @@ app.post("/signup", async (req, res) => {
           res.status(500).json({ message: "Signup failed" });
         } else {
           const insertResult = await db.query(
-            "INSERT INTO users (name, email, password, dob, whatsapp_number,sex,food) VALUES ($1, $2, $3, $4, $5,$6,$7) RETURNING *",
-            [name, email, hash, dob, whatsapp, sex, food],
+            "INSERT INTO users (name, email, password, dob, whatsapp_number, sex, food, cstate) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *",
+            [name, email, hash, dob, whatsapp, sex, food, state],
           );
 
           const user = insertResult.rows[0];
@@ -191,7 +218,6 @@ User Details Provided:
 * Gender
 * Height
 * Weight
-* Current medications
 
 IMPORTANT RULES:
 1. Use the user details to personalize recommendations.
@@ -330,7 +356,8 @@ Age: ${req.body.age}
 Gender: ${req.body.gender}
 Height: ${req.body.height}
 Weight: ${req.body.weight}
-Medications: ${req.body.medicines}
+State: ${req.body.state}
+Dietary Preference (Veg/Non-Veg): ${req.body.food}
 `;
 
     imagePath = req.file.path;
@@ -365,13 +392,17 @@ Medications: ${req.body.medicines}
             ? item.extractedName.trim()
             : "";
         const fallbackName =
-          typeof item.name === "string" && item.name.trim() ? item.name.trim() : "";
-        const normalizedName = expandedName || fallbackName || extractedName || "Unknown Parameter";
+          typeof item.name === "string" && item.name.trim()
+            ? item.name.trim()
+            : "";
+        const normalizedName =
+          expandedName || fallbackName || extractedName || "Unknown Parameter";
 
         return {
           ...item,
           extractedName: extractedName || fallbackName || normalizedName,
-          expandedName: expandedName || fallbackName || extractedName || normalizedName,
+          expandedName:
+            expandedName || fallbackName || extractedName || normalizedName,
           name: normalizedName,
           summary:
             typeof item.summary === "string" && item.summary.trim()
@@ -413,24 +444,44 @@ app.post("/save-tracker", async (req, res) => {
 
   try {
     if (!req.isAuthenticated()) {
-      console.log("❌ Blocked! User is not logged in (Session wiped)."); // <-- ADD THIS
+      console.log("Blocked! User is not logged in (Session wiped)."); // <-- ADD THIS
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    console.log("🔓 User is authenticated. Saving data..."); // <-- ADD THIS
+    console.log("User is authenticated. Saving data..."); // <-- ADD THIS
     const userId = req.user.id;
-    const dayOrder = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
-    const rawDietPlan = req.body?.dietPlan && typeof req.body.dietPlan === "object" ? req.body.dietPlan : {};
-    const rawExercisePlan = req.body?.exercisePlan && typeof req.body.exercisePlan === "object" ? req.body.exercisePlan : {};
+    const dayOrder = [
+      "monday",
+      "tuesday",
+      "wednesday",
+      "thursday",
+      "friday",
+      "saturday",
+      "sunday",
+    ];
+    const rawDietPlan =
+      req.body?.dietPlan && typeof req.body.dietPlan === "object"
+        ? req.body.dietPlan
+        : {};
+    const rawExercisePlan =
+      req.body?.exercisePlan && typeof req.body.exercisePlan === "object"
+        ? req.body.exercisePlan
+        : {};
     const waterIntakePerDay = req.body?.waterIntakePerDay || "2-3 liters/day";
     const minimumSleepHours = req.body?.minimumSleepHours || "7-8";
 
     // Normalize day keys so TodoTracker (which expects lowercase days) always matches.
     const dietPlan = Object.fromEntries(
-      Object.entries(rawDietPlan).map(([day, meals]) => [String(day).toLowerCase(), meals]),
+      Object.entries(rawDietPlan).map(([day, meals]) => [
+        String(day).toLowerCase(),
+        meals,
+      ]),
     );
     const exercisePlan = Object.fromEntries(
-      Object.entries(rawExercisePlan).map(([day, exercises]) => [String(day).toLowerCase(), exercises]),
+      Object.entries(rawExercisePlan).map(([day, exercises]) => [
+        String(day).toLowerCase(),
+        exercises,
+      ]),
     );
 
     // 1. CLEANUP: Delete old plans so we don't spam the Todo Tracker
@@ -448,24 +499,41 @@ app.post("/save-tracker", async (req, res) => {
       const dinners = Array.isArray(meals.dinner) ? meals.dinner : [];
 
       for (const food of breakfasts) {
-        await db.query("INSERT INTO diet (user_id, day, meal_time, food) VALUES ($1,$2,$3,$4)", [userId, day, "bf", food]);
+        await db.query(
+          "INSERT INTO diet (user_id, day, meal_time, food) VALUES ($1,$2,$3,$4)",
+          [userId, day, "bf", food],
+        );
       }
       for (const food of lunches) {
-        await db.query("INSERT INTO diet (user_id, day, meal_time, food) VALUES ($1,$2,$3,$4)", [userId, day, "lu", food]);
+        await db.query(
+          "INSERT INTO diet (user_id, day, meal_time, food) VALUES ($1,$2,$3,$4)",
+          [userId, day, "lu", food],
+        );
       }
       for (const food of snacks) {
-        await db.query("INSERT INTO diet (user_id, day, meal_time, food) VALUES ($1,$2,$3,$4)", [userId, day, "sn", food]);
+        await db.query(
+          "INSERT INTO diet (user_id, day, meal_time, food) VALUES ($1,$2,$3,$4)",
+          [userId, day, "sn", food],
+        );
       }
       for (const food of dinners) {
-        await db.query("INSERT INTO diet (user_id, day, meal_time, food) VALUES ($1,$2,$3,$4)", [userId, day, "di", food]);
+        await db.query(
+          "INSERT INTO diet (user_id, day, meal_time, food) VALUES ($1,$2,$3,$4)",
+          [userId, day, "di", food],
+        );
       }
     }
 
     // 3. Save Exercise
     for (const day of dayOrder) {
-      const dayExercises = Array.isArray(exercisePlan[day]) ? exercisePlan[day] : [];
+      const dayExercises = Array.isArray(exercisePlan[day])
+        ? exercisePlan[day]
+        : [];
       for (const ex of dayExercises) {
-        await db.query("INSERT INTO exercise (user_id, day, exercise) VALUES ($1,$2,$3)", [userId, day, ex]);
+        await db.query(
+          "INSERT INTO exercise (user_id, day, exercise) VALUES ($1,$2,$3)",
+          [userId, day, ex],
+        );
       }
     }
 
@@ -483,7 +551,7 @@ app.post("/save-tracker", async (req, res) => {
 
     // 6. Update data and analysis_date
     await db.query(
-      "UPDATE users SET data = 1, analysis_date = NOW() WHERE id = $1",
+      "UPDATE users SET cdata = 1, analysis_date = NOW() WHERE id = $1",
       [userId],
     );
 
@@ -511,7 +579,7 @@ async function deleteExpiredData() {
       await db.query("DELETE FROM sleep WHERE user_id=$1", [userId]);
       await db.query("DELETE FROM water WHERE user_id=$1", [userId]);
 
-      await db.query("UPDATE users SET data = 0 WHERE id=$1", [userId]);
+      await db.query("UPDATE users SET cdata = 0 WHERE id=$1", [userId]);
     }
 
     console.log("Expired user tracker data cleaned");
@@ -531,12 +599,12 @@ app.get("/get-tracker", async (req, res) => {
     const userId = req.user.id;
 
     // check data flag first
-    const userResult = await db.query("SELECT data FROM users WHERE id=$1", [
+    const userResult = await db.query("SELECT cdata FROM users WHERE id=$1", [
       userId,
     ]);
     const user = userResult.rows[0];
 
-    if (!user || user.data === 0) {
+    if (!user || user.cdata === 0) {
       return res.json({ hasData: false });
     }
 
@@ -589,17 +657,29 @@ const formatList = (items, fallback) => {
 
 const getUsersWithWhatsapp = async () => {
   const users = await db.query(
-    "SELECT id, name, whatsapp_number FROM users WHERE whatsapp_number IS NOT NULL AND data = 1"
+    "SELECT id, name, whatsapp_number FROM users WHERE whatsapp_number IS NOT NULL AND cdata = 1",
   );
   return users.rows;
 };
 
 const getDailyPlanForUser = async (userId, day) => {
   const [dietRows, exerciseRows, waterRow, sleepRow] = await Promise.all([
-    db.query("SELECT meal_time, food FROM diet WHERE user_id=$1 AND day=$2", [userId, day]),
-    db.query("SELECT exercise FROM exercise WHERE user_id=$1 AND day=$2", [userId, day]),
-    db.query("SELECT water FROM water WHERE user_id=$1 ORDER BY id DESC LIMIT 1", [userId]),
-    db.query("SELECT sleep_hour FROM sleep WHERE user_id=$1 ORDER BY id DESC LIMIT 1", [userId]),
+    db.query("SELECT meal_time, food FROM diet WHERE user_id=$1 AND day=$2", [
+      userId,
+      day,
+    ]),
+    db.query("SELECT exercise FROM exercise WHERE user_id=$1 AND day=$2", [
+      userId,
+      day,
+    ]),
+    db.query(
+      "SELECT water FROM water WHERE user_id=$1 ORDER BY id DESC LIMIT 1",
+      [userId],
+    ),
+    db.query(
+      "SELECT sleep_hour FROM sleep WHERE user_id=$1 ORDER BY id DESC LIMIT 1",
+      [userId],
+    ),
   ]);
 
   const meals = { bf: [], lu: [], sn: [], di: [] };
@@ -646,7 +726,7 @@ const getISTHour = () => {
       timeZone: "Asia/Kolkata",
       hour: "2-digit",
       hour12: false,
-    }).format(new Date())
+    }).format(new Date()),
   );
 };
 
@@ -688,7 +768,9 @@ const sendBreakfastReminders = async (source = "cron") => {
     sentCount += 1;
   }
 
-  console.log(`[BREAKFAST ${source.toUpperCase()}] Sent reminders: ${sentCount}`);
+  console.log(
+    `[BREAKFAST ${source.toUpperCase()}] Sent reminders: ${sentCount}`,
+  );
 };
 
 const sendLunchReminders = async (source = "cron") => {
@@ -711,7 +793,9 @@ const sendLunchReminders = async (source = "cron") => {
     sentCount += 1;
   }
 
-  console.log(`[LUNCH ${source.toUpperCase()}] Sent lunch reminders: ${sentCount}`);
+  console.log(
+    `[LUNCH ${source.toUpperCase()}] Sent lunch reminders: ${sentCount}`,
+  );
 };
 
 const sendEveningReminders = async (source = "cron") => {
@@ -774,7 +858,7 @@ cron.schedule(
       console.error("Cron Error:", err);
     }
   },
-  { scheduled: true, timezone: "Asia/Kolkata" }
+  { scheduled: true, timezone: "Asia/Kolkata" },
 );
 
 // 2. AFTERNOON (12:00 PM IST) - Lunch + Water
@@ -787,7 +871,7 @@ cron.schedule(
       console.error("Cron Error:", err);
     }
   },
-  { scheduled: true, timezone: "Asia/Kolkata" }
+  { scheduled: true, timezone: "Asia/Kolkata" },
 );
 
 const processActiveSlotWindows = async (source = "window-check") => {
@@ -825,7 +909,7 @@ cron.schedule(
       console.error("Window Check Error:", err);
     }
   },
-  { scheduled: true, timezone: "Asia/Kolkata" }
+  { scheduled: true, timezone: "Asia/Kolkata" },
 );
 
 // 3. EVENING (5:00 PM IST) - Snack & Gym Check + Water
@@ -838,7 +922,7 @@ cron.schedule(
       console.error("Cron Error:", err);
     }
   },
-  { scheduled: true, timezone: "Asia/Kolkata" }
+  { scheduled: true, timezone: "Asia/Kolkata" },
 );
 
 // 4. NIGHT (8:00 PM IST) - Dinner + Water
@@ -851,7 +935,7 @@ cron.schedule(
       console.error("Cron Error:", err);
     }
   },
-  { scheduled: true, timezone: "Asia/Kolkata" }
+  { scheduled: true, timezone: "Asia/Kolkata" },
 );
 
 // 5. BEDTIME (10:00 PM IST) - Sleep
@@ -876,9 +960,8 @@ cron.schedule(
       console.error("Cron Error:", err);
     }
   },
-  { scheduled: true, timezone: "Asia/Kolkata" }
+  { scheduled: true, timezone: "Asia/Kolkata" },
 );
-
 
 app.listen(port, () => {
   console.log(`Your app is listening to port ${port}`);

@@ -4,9 +4,11 @@ CREATE TABLE users (
     email VARCHAR(150) UNIQUE NOT NULL,
     password TEXT NOT NULL,
     dob DATE,
+    whatsapp_number VARCHAR(20),
     food VARCHAR(20),
+    cstate VARCHAR(100),
     sex VARCHAR(20),
-    data INT DEFAULT 0,
+    cdata INT DEFAULT 0,
     analysis_date TIMESTAMP
 );
 
