@@ -35,7 +35,7 @@ app.use(
 
 app.use(
   session({
-    secret: process.env.SECRET || "default_secret_key", // Added a fallback just in case
+    secret: process.env.SECRET || "default_secret_key",
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -444,15 +444,15 @@ Dietary Preference (Veg/Non-Veg): ${req.body.food}
 });
 
 app.post("/save-tracker", async (req, res) => {
-  console.log("🚪 Someone knocked on the /save-tracker door!"); // <-- ADD THIS
+  console.log("Someone knocked on the /save-tracker door!");
 
   try {
     if (!req.isAuthenticated()) {
-      console.log("Blocked! User is not logged in (Session wiped)."); // <-- ADD THIS
+      console.log("Blocked! User is not logged in (Session wiped).");
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    console.log("User is authenticated. Saving data..."); // <-- ADD THIS
+    console.log("User is authenticated. Saving data...");
     const userId = req.user.id;
     const dayOrder = [
       "monday",
@@ -566,9 +566,6 @@ app.post("/save-tracker", async (req, res) => {
   }
 });
 
-// DO NOT TOUCH your deleteExpiredData() function below this! Keep it right here.
-// async function deleteExpiredData() { ... }
-
 async function deleteExpiredData() {
   try {
     const result = await db.query(
@@ -640,9 +637,7 @@ app.get("/get-tracker", async (req, res) => {
   }
 });
 
-// ==========================================
 // TWILIO WHATSAPP BOT: THE DAILY COACH
-// ==========================================
 
 // Helper function to get today's day in lowercase (e.g., "monday")
 const getTodayName = () => {
