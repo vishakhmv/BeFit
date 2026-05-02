@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import TodoTracker from "./TodoTracker";
 import ChatBot from "./ChatBot";
+import Profile from "./Profile";
 
 export default function Home() {
   const navigate = useNavigate();
@@ -12,6 +13,8 @@ export default function Home() {
   
   // Your ChatBot state
   const [isChatOpen, setIsChatOpen] = useState(false);
+  //profile state
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   
   // Teammate's Upload & Auth state
   const [loading, setLoading] = useState(false);
@@ -99,10 +102,20 @@ export default function Home() {
     <div className="home-container">
       <nav className="navbar">
         <h1 className="logo">BeFit</h1>
-        <div className="nav-links">
+        <div className="nav-links" style={{ display: "flex", alignItems: "center", width: "100%", justifyContent: "flex-end" }}>
           <span>About us</span>
           <span>Help & Support</span>
-          <span>Profile</span>
+          <span
+  onClick={() => setIsProfileOpen(true)}
+  style={{ cursor: "pointer", display: "flex", alignItems: "center" }}
+  title="Profile"
+>
+  <svg viewBox="0 0 32 32" width="30" height="30">
+    <circle cx="16" cy="16" r="16" fill="#2c5f63" />
+    <circle cx="16" cy="12" r="5" fill="rgba(255,255,255,0.9)" />
+    <ellipse cx="16" cy="26" rx="9" ry="6" fill="rgba(255,255,255,0.9)" />
+  </svg>
+</span>
         </div>
       </nav>
 
@@ -322,8 +335,9 @@ export default function Home() {
           {view === "todo" && <TodoTracker />}
         </main>
       </div>
-
-      <ChatBot isOpen={isChatOpen} onClose={toggleChat} reportData={result} />
+      
+      <Profile isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} />
+      <ChatBot isOpen={isChatOpen} onClose={toggleChat} />
 
       <div className="bot-button" onClick={toggleChat} style={{
           position: "fixed", bottom: "20px", right: "20px", width: "60px", height: "60px", backgroundColor: "#2c5f63", color: "white", borderRadius: "50%", display: "flex", justifyContent: "center", alignItems: "center", cursor: "pointer", boxShadow: "0 4px 6px rgba(0,0,0,0.1)", zIndex: 1000

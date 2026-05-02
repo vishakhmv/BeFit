@@ -4,14 +4,10 @@ CREATE TABLE users (
     email VARCHAR(150) UNIQUE NOT NULL,
     password TEXT NOT NULL,
     dob DATE,
-    whatsapp_number VARCHAR(20),
-    food VARCHAR(20),
-    cstate VARCHAR(100),
-    sex VARCHAR(20),
-    cdata INT DEFAULT 0,
+    data INT DEFAULT 0,
     analysis_date TIMESTAMP
 );
-
+ 
 CREATE TABLE diet (
     id SERIAL PRIMARY KEY,
     user_id INT REFERENCES users(id),
@@ -19,22 +15,21 @@ CREATE TABLE diet (
     meal_time VARCHAR(10),
     food TEXT
 );
-
+ 
 CREATE TABLE exercise (
     id SERIAL PRIMARY KEY,
     user_id INT REFERENCES users(id),
     day VARCHAR(20),
     exercise TEXT
 );
-
+ 
 CREATE TABLE sleep (
     id SERIAL PRIMARY KEY,
     user_id INT REFERENCES users(id),
     sleep_hour VARCHAR(20)
 );
-
+ 
 CREATE TABLE water (
     id SERIAL PRIMARY KEY,
     user_id INT REFERENCES users(id),
     water VARCHAR(20)
-);
