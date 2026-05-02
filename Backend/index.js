@@ -231,7 +231,9 @@ IMPORTANT RULES:
 ANTI-HALLUCINATION & EVALUATION RULES:
 1. Extract ONLY visible parameters.
 2. NEVER guess or assume the patient's actual test values.
-3. EXCEPTION TO RULE 2 (MISSING RANGES): If the physical report does NOT provide a reference range for a specific parameter, you MUST use standard global medical reference ranges to evaluate if the status is LOW, NORMAL, or HIGH. Only use UNKNOWN if the parameter name itself is completely illegible.
+3. EXCEPTION TO RULE 2 (MISSING RANGES): If the physical report does NOT provide a reference range for a specific parameter,
+ you MUST use standard global medical reference ranges to evaluate if the status is LOW, NORMAL, or HIGH. 
+ Only use UNKNOWN if the parameter name itself is completely illegible.
 4. Copy values exactly with units.
 
 ERROR RESPONSE:
@@ -288,7 +290,8 @@ EXECUTIVE SUMMARY REQUIREMENTS:
 Generate a holistic action plan based on the abnormal values found.
 1. futureOutlook: A brief, motivating intro on how fixing these specific abnormal values will improve their life and future health.
 2. keyFocusAreas: An array of the top 2-3 medical issues to focus on.
-3. dietaryFocus: Specific food advice to correct the abnormal values. This MUST strictly align with the user's Dietary Preference (Veg/Non-Veg) and highlight accessible regional dishes popular in their State.
+3. dietaryFocus: Specific food advice to correct the abnormal values.
+ This MUST strictly align with the user's Dietary Preference (Veg/Non-Veg) and highlight accessible regional dishes popular in their State.
 4. estimatedCalories: An estimated daily calorie goal based on their height, weight, age, and gender.
 5. estimatedProtein: An estimated daily protein goal (in grams) based on their weight.
 6. lifestyleAdvice: Specific exercise and sleep adjustments needed for their specific blood results.
@@ -355,6 +358,14 @@ OUTPUT FORMAT:
 app.post("/analyze", upload.single("report"), async (req, res) => {
   let imagePath;
   try {
+    if (!req.isAuthenticated()) {
+      if (req.file) fs.unlinkSync(req.file.path);
+      return res
+        .status(401)
+        .json({ message: "Unauthorized. Please log in first." });
+    }
+
+    const userId = req.user.id;
     const userDetails = `
 Age: ${req.body.age}
 Gender: ${req.body.gender}
@@ -365,10 +376,7 @@ Dietary Preference (Veg/Non-Veg): ${req.body.food}
 `;
 
     imagePath = req.file.path;
-
-    const imageData = fs.readFileSync(imagePath, {
-      encoding: "base64",
-    });
+    const imageData = fs.readFileSync(imagePath, { encoding: "base64" });
 
     const result = await model.generateContent([
       BLOOD_PROMPT + "\n\nUser Info:\n" + userDetails,
@@ -383,6 +391,11 @@ Dietary Preference (Veg/Non-Veg): ${req.body.food}
     const aiResponse = result.response.text();
     const clean = aiResponse.replace(/```json|```/g, "");
     const parsed = JSON.parse(clean);
+
+    if (parsed.error) {
+      fs.unlinkSync(imagePath);
+      return res.status(400).json(parsed);
+    }
 
     if (Array.isArray(parsed.results)) {
       parsed.results = parsed.results.map((item = {}) => {
@@ -428,18 +441,134 @@ Dietary Preference (Veg/Non-Veg): ${req.body.food}
       });
     }
 
-    if (parsed.error) {
-      fs.unlinkSync(imagePath);
-      return res.status(400).json(parsed);
+    await db.query("DELETE FROM executive_summary WHERE user_id=$1", [userId]);
+    await db.query("DELETE FROM blood_results WHERE user_id=$1", [userId]);
+
+    const es = parsed.executiveSummary;
+    await db.query(
+      `INSERT INTO executive_summary (user_id, future_outlook, key_focus_areas, dietary_focus, estimated_calories, estimated_protein, lifestyle_advice) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        userId,
+        es.futureOutlook,
+        JSON.stringify(es.keyFocusAreas),
+        es.dietaryFocus,
+        es.estimatedCalories,
+        es.estimatedProtein,
+        es.lifestyleAdvice,
+      ],
+    );
+
+    for (const resItem of parsed.results) {
+      await db.query(
+        `INSERT INTO blood_results (user_id, extracted_name, expanded_name, test_value, status, issues, why_it_happens, summary, what_if_low, what_if_high) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        [
+          userId,
+          resItem.extractedName,
+          resItem.expandedName,
+          resItem.value,
+          resItem.status,
+          resItem.issues,
+          resItem.whyItHappens,
+          resItem.summary,
+          resItem.whatIfLow,
+          resItem.whatIfHigh,
+        ],
+      );
     }
+
+    const savedSummary = await db.query(
+      "SELECT * FROM executive_summary WHERE user_id=$1",
+      [userId],
+    );
+    const savedResults = await db.query(
+      "SELECT * FROM blood_results WHERE user_id=$1",
+      [userId],
+    );
+
+    const finalData = {
+      executiveSummary: {
+        futureOutlook: savedSummary.rows[0].future_outlook,
+        keyFocusAreas: savedSummary.rows[0].key_focus_areas,
+        dietaryFocus: savedSummary.rows[0].dietary_focus,
+        estimatedCalories: savedSummary.rows[0].estimated_calories,
+        estimatedProtein: savedSummary.rows[0].estimated_protein,
+        lifestyleAdvice: savedSummary.rows[0].lifestyle_advice,
+      },
+      results: savedResults.rows.map((r) => ({
+        extractedName: r.extracted_name,
+        expandedName: r.expanded_name,
+        value: r.test_value,
+        status: r.status,
+        issues: r.issues,
+        whyItHappens: r.why_it_happens,
+        summary: r.summary,
+        whatIfLow: r.what_if_low,
+        whatIfHigh: r.what_if_high,
+      })),
+      dietPlan: parsed.dietPlan,
+      exercisePlan: parsed.exercisePlan,
+      waterIntakePerDay: parsed.waterIntakePerDay,
+      minimumSleepHours: parsed.minimumSleepHours,
+    };
+
     fs.unlinkSync(imagePath);
-    res.json(parsed);
+    res.json(finalData);
   } catch (error) {
-    if (imagePath && fs.existsSync(imagePath)) {
-      fs.unlinkSync(imagePath);
-    }
+    if (imagePath && fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
     console.error(error);
     res.status(500).json({ message: "Analysis failed" });
+  }
+});
+
+app.get("/get-analysis", async (req, res) => {
+  try {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const userId = req.user.id;
+
+    const summaryRes = await db.query(
+      "SELECT * FROM executive_summary WHERE user_id=$1",
+      [userId],
+    );
+    const resultsRes = await db.query(
+      "SELECT * FROM blood_results WHERE user_id=$1",
+      [userId],
+    );
+
+    if (summaryRes.rows.length === 0) {
+      return res
+        .status(404)
+        .json({ message: "No saved analysis found for this user." });
+    }
+
+    res.json({
+      executiveSummary: {
+        futureOutlook: summaryRes.rows[0].future_outlook,
+        keyFocusAreas: summaryRes.rows[0].key_focus_areas,
+        dietaryFocus: summaryRes.rows[0].dietary_focus,
+        estimatedCalories: summaryRes.rows[0].estimated_calories,
+        estimatedProtein: summaryRes.rows[0].estimated_protein,
+        lifestyleAdvice: summaryRes.rows[0].lifestyle_advice,
+      },
+      results: resultsRes.rows.map((r) => ({
+        extractedName: r.extracted_name,
+        expandedName: r.expanded_name,
+        value: r.test_value,
+        status: r.status,
+        issues: r.issues,
+        whyItHappens: r.why_it_happens,
+        summary: r.summary,
+        whatIfLow: r.what_if_low,
+        whatIfHigh: r.what_if_high,
+      })),
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to fetch saved analysis" });
   }
 });
 
@@ -474,7 +603,6 @@ app.post("/save-tracker", async (req, res) => {
     const waterIntakePerDay = req.body?.waterIntakePerDay || "2-3 liters/day";
     const minimumSleepHours = req.body?.minimumSleepHours || "7-8";
 
-    // Normalize day keys so TodoTracker (which expects lowercase days) always matches.
     const dietPlan = Object.fromEntries(
       Object.entries(rawDietPlan).map(([day, meals]) => [
         String(day).toLowerCase(),
@@ -488,13 +616,11 @@ app.post("/save-tracker", async (req, res) => {
       ]),
     );
 
-    // 1. CLEANUP: Delete old plans so we don't spam the Todo Tracker
     await db.query("DELETE FROM diet WHERE user_id=$1", [userId]);
     await db.query("DELETE FROM exercise WHERE user_id=$1", [userId]);
     await db.query("DELETE FROM sleep WHERE user_id=$1", [userId]);
     await db.query("DELETE FROM water WHERE user_id=$1", [userId]);
 
-    // 2. Save Diet (The infinite fetch loop has been removed from here)
     for (const day of dayOrder) {
       const meals = dietPlan[day] || {};
       const breakfasts = Array.isArray(meals.breakfast) ? meals.breakfast : [];
@@ -580,6 +706,11 @@ async function deleteExpiredData() {
       await db.query("DELETE FROM sleep WHERE user_id=$1", [userId]);
       await db.query("DELETE FROM water WHERE user_id=$1", [userId]);
 
+      await db.query("DELETE FROM executive_summary WHERE user_id=$1", [
+        userId,
+      ]);
+      await db.query("DELETE FROM blood_results WHERE user_id=$1", [userId]);
+
       await db.query("UPDATE users SET cdata = 0 WHERE id=$1", [userId]);
     }
 
@@ -588,7 +719,6 @@ async function deleteExpiredData() {
     console.error(err);
   }
 }
-
 setInterval(deleteExpiredData, 1000 * 60 * 60 * 24);
 
 app.get("/get-tracker", async (req, res) => {
