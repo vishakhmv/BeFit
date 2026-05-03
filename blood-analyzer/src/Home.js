@@ -82,6 +82,14 @@ export default function Home() {
       });
 
       const data = await res.json();
+
+      if (!data || !Array.isArray(data.results)) {
+        console.error("❌ Invalid response from server:", data);
+        alert(data?.message || "Analysis failed. The report could not be read. Please try a clearer image.");
+        setLoading(false);
+        return;
+      }
+
       setResult(data);
       console.log("✅ Analysis complete and fully saved to database!");
     } catch (err) {
