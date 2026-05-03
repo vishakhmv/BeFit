@@ -375,7 +375,53 @@ OUTPUT FORMAT:
 "minimumSleepHours": ""
 }
 `;
+// --- HELPER FUNCTION: Fetch formatted data from DB ---
+const getAnalysisFromDB = async (userId) => {
+  const summaryRes = await db.query(
+    "SELECT * FROM executive_summary WHERE user_id=$1",
+    [userId],
+  );
+  const resultsRes = await db.query(
+    "SELECT * FROM blood_results WHERE user_id=$1",
+    [userId],
+  );
+  const sleepRes = await db.query(
+    "SELECT sleep_hour FROM sleep WHERE user_id=$1 ORDER BY id DESC LIMIT 1",
+    [userId],
+  );
+  const waterRes = await db.query(
+    "SELECT water FROM water WHERE user_id=$1 ORDER BY id DESC LIMIT 1",
+    [userId],
+  );
 
+  if (summaryRes.rows.length === 0) return null;
+
+  return {
+    executiveSummary: {
+      futureOutlook: summaryRes.rows[0].future_outlook,
+      keyFocusAreas: summaryRes.rows[0].key_focus_areas,
+      dietaryFocus: summaryRes.rows[0].dietary_focus,
+      estimatedCalories: summaryRes.rows[0].estimated_calories,
+      estimatedProtein: summaryRes.rows[0].estimated_protein,
+      lifestyleAdvice: summaryRes.rows[0].lifestyle_advice,
+    },
+    results: resultsRes.rows.map((r) => ({
+      extractedName: r.extracted_name,
+      expandedName: r.expanded_name,
+      value: r.test_value,
+      status: r.status,
+      issues: r.issues,
+      whyItHappens: r.why_it_happens,
+      summary: r.summary,
+      whatIfLow: r.what_if_low,
+      whatIfHigh: r.what_if_high,
+    })),
+    waterIntakePerDay: waterRes.rows[0]?.water || "2-3 liters/day",
+    minimumSleepHours: sleepRes.rows[0]?.sleep_hour || "7-8",
+  };
+};
+
+// --- UPDATED /analyze ROUTE ---
 app.post(
   "/analyze",
   async (req, res, next) => {
@@ -388,18 +434,15 @@ app.post(
   },
   (req, res, next) => {
     upload.single("report")(req, res, (err) => {
-      if (err) {
-        return res.status(400).json({ message: err.message });
-      }
+      if (err) return res.status(400).json({ message: err.message });
       next();
     });
   },
   async (req, res) => {
     let imagePath;
     try {
-      if (!req.file) {
+      if (!req.file)
         return res.status(400).json({ message: "No file uploaded." });
-      }
 
       const userId = req.user.id;
       const userDetails = `
@@ -417,10 +460,7 @@ Dietary Preference (Veg/Non-Veg): ${req.body.food}
       const result = await model.generateContent([
         BLOOD_PROMPT + "\n\nUser Info:\n" + userDetails,
         {
-          inlineData: {
-            mimeType: req.file.mimetype,
-            data: imageData,
-          },
+          inlineData: { mimeType: req.file.mimetype, data: imageData },
         },
       ]);
 
@@ -433,6 +473,7 @@ Dietary Preference (Veg/Non-Veg): ${req.body.food}
         return res.status(400).json(parsed);
       }
 
+      // Format parameter names
       if (Array.isArray(parsed.results)) {
         parsed.results = parsed.results.map((item = {}) => {
           const status = (item.status || "UNKNOWN").toUpperCase();
@@ -480,15 +521,21 @@ Dietary Preference (Veg/Non-Veg): ${req.body.food}
         });
       }
 
+      // 1. DELETE OLD DATA
       await db.query("DELETE FROM executive_summary WHERE user_id=$1", [
         userId,
       ]);
       await db.query("DELETE FROM blood_results WHERE user_id=$1", [userId]);
+      await db.query("DELETE FROM diet WHERE user_id=$1", [userId]);
+      await db.query("DELETE FROM exercise WHERE user_id=$1", [userId]);
+      await db.query("DELETE FROM sleep WHERE user_id=$1", [userId]);
+      await db.query("DELETE FROM water WHERE user_id=$1", [userId]);
 
+      // 2. INSERT EXECUTIVE SUMMARY
       const es = parsed.executiveSummary;
       await db.query(
         `INSERT INTO executive_summary (user_id, future_outlook, key_focus_areas, dietary_focus, estimated_calories, estimated_protein, lifestyle_advice) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [
           userId,
           es.futureOutlook,
@@ -500,10 +547,11 @@ Dietary Preference (Veg/Non-Veg): ${req.body.food}
         ],
       );
 
+      // 3. INSERT BLOOD RESULTS
       for (const resItem of parsed.results) {
         await db.query(
           `INSERT INTO blood_results (user_id, extracted_name, expanded_name, test_value, status, issues, why_it_happens, summary, what_if_low, what_if_high) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
           [
             userId,
             resItem.extractedName,
@@ -519,41 +567,77 @@ Dietary Preference (Veg/Non-Veg): ${req.body.food}
         );
       }
 
-      const savedSummary = await db.query(
-        "SELECT * FROM executive_summary WHERE user_id=$1",
-        [userId],
-      );
-      const savedResults = await db.query(
-        "SELECT * FROM blood_results WHERE user_id=$1",
+      // 4. INSERT TRACKER DATA (Diet, Exercise, Sleep, Water)
+      const dayOrder = [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday",
+      ];
+      const dietPlan = parsed.dietPlan || {};
+      const exercisePlan = parsed.exercisePlan || {};
+
+      for (const day of dayOrder) {
+        const meals = dietPlan[day] || {};
+        const breakfasts = Array.isArray(meals.breakfast)
+          ? meals.breakfast
+          : [];
+        const lunches = Array.isArray(meals.lunch) ? meals.lunch : [];
+        const snacks = Array.isArray(meals.snacks) ? meals.snacks : [];
+        const dinners = Array.isArray(meals.dinner) ? meals.dinner : [];
+
+        for (const food of breakfasts)
+          await db.query(
+            "INSERT INTO diet (user_id, day, meal_time, food) VALUES ($1,$2,$3,$4)",
+            [userId, day, "bf", food],
+          );
+        for (const food of lunches)
+          await db.query(
+            "INSERT INTO diet (user_id, day, meal_time, food) VALUES ($1,$2,$3,$4)",
+            [userId, day, "lu", food],
+          );
+        for (const food of snacks)
+          await db.query(
+            "INSERT INTO diet (user_id, day, meal_time, food) VALUES ($1,$2,$3,$4)",
+            [userId, day, "sn", food],
+          );
+        for (const food of dinners)
+          await db.query(
+            "INSERT INTO diet (user_id, day, meal_time, food) VALUES ($1,$2,$3,$4)",
+            [userId, day, "di", food],
+          );
+
+        const dayExercises = Array.isArray(exercisePlan[day])
+          ? exercisePlan[day]
+          : [];
+        for (const ex of dayExercises) {
+          await db.query(
+            "INSERT INTO exercise (user_id, day, exercise) VALUES ($1,$2,$3)",
+            [userId, day, ex],
+          );
+        }
+      }
+
+      await db.query("INSERT INTO sleep (user_id, sleep_hour) VALUES ($1,$2)", [
+        userId,
+        parsed.minimumSleepHours || "7-8",
+      ]);
+      await db.query("INSERT INTO water (user_id, water) VALUES ($1,$2)", [
+        userId,
+        parsed.waterIntakePerDay || "2-3 liters/day",
+      ]);
+
+      // Update data flag
+      await db.query(
+        "UPDATE users SET cdata = 1, analysis_date = NOW() WHERE id = $1",
         [userId],
       );
 
-      const finalData = {
-        executiveSummary: {
-          futureOutlook: savedSummary.rows[0].future_outlook,
-          keyFocusAreas: savedSummary.rows[0].key_focus_areas,
-          dietaryFocus: savedSummary.rows[0].dietary_focus,
-          estimatedCalories: savedSummary.rows[0].estimated_calories,
-          estimatedProtein: savedSummary.rows[0].estimated_protein,
-          lifestyleAdvice: savedSummary.rows[0].lifestyle_advice,
-        },
-        results: savedResults.rows.map((r) => ({
-          extractedName: r.extracted_name,
-          expandedName: r.expanded_name,
-          value: r.test_value,
-          status: r.status,
-          issues: r.issues,
-          whyItHappens: r.why_it_happens,
-          summary: r.summary,
-          whatIfLow: r.what_if_low,
-          whatIfHigh: r.what_if_high,
-        })),
-        dietPlan: parsed.dietPlan,
-        exercisePlan: parsed.exercisePlan,
-        waterIntakePerDay: parsed.waterIntakePerDay,
-        minimumSleepHours: parsed.minimumSleepHours,
-      };
-
+      // 5. FETCH FROM DB & RETURN (Ensures UI only gets what is saved)
+      const finalData = await getAnalysisFromDB(userId);
       fs.unlinkSync(imagePath);
       res.json(finalData);
     } catch (error) {
@@ -564,56 +648,26 @@ Dietary Preference (Veg/Non-Veg): ${req.body.food}
   },
 );
 
+// --- UPDATED /get-analysis ROUTE ---
 app.get("/get-analysis", async (req, res) => {
   try {
-    if (!req.isAuthenticated()) {
+    if (!req.isAuthenticated())
       return res.status(401).json({ message: "Unauthorized" });
-    }
 
-    const userId = req.user.id;
+    const data = await getAnalysisFromDB(req.user.id);
 
-    const summaryRes = await db.query(
-      "SELECT * FROM executive_summary WHERE user_id=$1",
-      [userId],
-    );
-    const resultsRes = await db.query(
-      "SELECT * FROM blood_results WHERE user_id=$1",
-      [userId],
-    );
-
-    if (summaryRes.rows.length === 0) {
+    if (!data) {
       return res
         .status(404)
         .json({ message: "No saved analysis found for this user." });
     }
 
-    res.json({
-      executiveSummary: {
-        futureOutlook: summaryRes.rows[0].future_outlook,
-        keyFocusAreas: summaryRes.rows[0].key_focus_areas,
-        dietaryFocus: summaryRes.rows[0].dietary_focus,
-        estimatedCalories: summaryRes.rows[0].estimated_calories,
-        estimatedProtein: summaryRes.rows[0].estimated_protein,
-        lifestyleAdvice: summaryRes.rows[0].lifestyle_advice,
-      },
-      results: resultsRes.rows.map((r) => ({
-        extractedName: r.extracted_name,
-        expandedName: r.expanded_name,
-        value: r.test_value,
-        status: r.status,
-        issues: r.issues,
-        whyItHappens: r.why_it_happens,
-        summary: r.summary,
-        whatIfLow: r.what_if_low,
-        whatIfHigh: r.what_if_high,
-      })),
-    });
+    res.json(data);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Failed to fetch saved analysis" });
   }
 });
-
 app.post("/save-tracker", async (req, res) => {
   console.log("Someone knocked on the /save-tracker door!");
 
