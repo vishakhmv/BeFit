@@ -2,6 +2,7 @@ CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     email VARCHAR(150) UNIQUE NOT NULL,
+    whatsapp_number VARCHAR(15),
     password TEXT NOT NULL,
     dob DATE,
     data INT DEFAULT 0,
