@@ -85,7 +85,7 @@ export default function Signup() {
           />
           <select value={food} onChange={(e) => setPreference(e.target.value)}>
             <option value="">Select Food Preference</option>
-            {foodPreferences.map((item, index) => (
+            {foods.map((item, index) => (
               <option key={index} value={item}>
                 {item}
               </option>
