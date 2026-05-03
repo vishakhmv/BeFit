@@ -5,7 +5,10 @@ CREATE TABLE users (
     whatsapp_number VARCHAR(15),
     password TEXT NOT NULL,
     dob DATE,
-    data INT DEFAULT 0,
+    sex VARCHAR(20),
+    food VARCHAR(50),
+    cstate VARCHAR(100),
+    cdata INT DEFAULT 0,
     analysis_date TIMESTAMP
 );
  
