@@ -201,7 +201,28 @@ passport.deserializeUser((user, cb) => {
   cb(null, user);
 });
 
-const upload = multer({ dest: "uploads/" });
+const upload = multer({
+  dest: "uploads/",
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "image/heic",
+      "application/pdf",
+    ];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(
+        new Error(
+          "Invalid file type. Only images (JPG, PNG, WEBP) and PDFs are allowed.",
+        ),
+      );
+    }
+  },
+});
 
 // Generative AI Connection
 const genAI = new GoogleGenerativeAI(process.env.APIKey);
@@ -211,10 +232,10 @@ const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
 const BLOOD_PROMPT = `
 You are an AI blood test report analyzer.
 
-The user will upload an image of a blood test report along with personal details.
+The user will upload an image OR a PDF document of a blood test report along with personal details.
 
 User Details Provided:
-* Age
+* Age 
 * Gender
 * Height
 * Weight
@@ -355,18 +376,33 @@ OUTPUT FORMAT:
 }
 `;
 
-app.post("/analyze", upload.single("report"), async (req, res) => {
-  let imagePath;
-  try {
+app.post(
+  "/analyze",
+  async (req, res, next) => {
     if (!req.isAuthenticated()) {
-      if (req.file) fs.unlinkSync(req.file.path);
       return res
         .status(401)
         .json({ message: "Unauthorized. Please log in first." });
     }
+    next();
+  },
+  (req, res, next) => {
+    upload.single("report")(req, res, (err) => {
+      if (err) {
+        return res.status(400).json({ message: err.message });
+      }
+      next();
+    });
+  },
+  async (req, res) => {
+    let imagePath;
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded." });
+      }
 
-    const userId = req.user.id;
-    const userDetails = `
+      const userId = req.user.id;
+      const userDetails = `
 Age: ${req.body.age}
 Gender: ${req.body.gender}
 Height: ${req.body.height}
@@ -375,152 +411,158 @@ State: ${req.body.state}
 Dietary Preference (Veg/Non-Veg): ${req.body.food}
 `;
 
-    imagePath = req.file.path;
-    const imageData = fs.readFileSync(imagePath, { encoding: "base64" });
+      imagePath = req.file.path;
+      const imageData = fs.readFileSync(imagePath, { encoding: "base64" });
 
-    const result = await model.generateContent([
-      BLOOD_PROMPT + "\n\nUser Info:\n" + userDetails,
-      {
-        inlineData: {
-          mimeType: req.file.mimetype,
-          data: imageData,
+      const result = await model.generateContent([
+        BLOOD_PROMPT + "\n\nUser Info:\n" + userDetails,
+        {
+          inlineData: {
+            mimeType: req.file.mimetype,
+            data: imageData,
+          },
         },
-      },
-    ]);
+      ]);
 
-    const aiResponse = result.response.text();
-    const clean = aiResponse.replace(/```json|```/g, "");
-    const parsed = JSON.parse(clean);
+      const aiResponse = result.response.text();
+      const clean = aiResponse.replace(/```json|```/g, "");
+      const parsed = JSON.parse(clean);
 
-    if (parsed.error) {
-      fs.unlinkSync(imagePath);
-      return res.status(400).json(parsed);
-    }
+      if (parsed.error) {
+        fs.unlinkSync(imagePath);
+        return res.status(400).json(parsed);
+      }
 
-    if (Array.isArray(parsed.results)) {
-      parsed.results = parsed.results.map((item = {}) => {
-        const status = (item.status || "UNKNOWN").toUpperCase();
-        const expandedName =
-          typeof item.expandedName === "string" && item.expandedName.trim()
-            ? item.expandedName.trim()
-            : "";
-        const extractedName =
-          typeof item.extractedName === "string" && item.extractedName.trim()
-            ? item.extractedName.trim()
-            : "";
-        const fallbackName =
-          typeof item.name === "string" && item.name.trim()
-            ? item.name.trim()
-            : "";
-        const normalizedName =
-          expandedName || fallbackName || extractedName || "Unknown Parameter";
+      if (Array.isArray(parsed.results)) {
+        parsed.results = parsed.results.map((item = {}) => {
+          const status = (item.status || "UNKNOWN").toUpperCase();
+          const expandedName =
+            typeof item.expandedName === "string" && item.expandedName.trim()
+              ? item.expandedName.trim()
+              : "";
+          const extractedName =
+            typeof item.extractedName === "string" && item.extractedName.trim()
+              ? item.extractedName.trim()
+              : "";
+          const fallbackName =
+            typeof item.name === "string" && item.name.trim()
+              ? item.name.trim()
+              : "";
+          const normalizedName =
+            expandedName ||
+            fallbackName ||
+            extractedName ||
+            "Unknown Parameter";
 
-        return {
-          ...item,
-          extractedName: extractedName || fallbackName || normalizedName,
-          expandedName:
-            expandedName || fallbackName || extractedName || normalizedName,
-          name: normalizedName,
-          summary:
-            typeof item.summary === "string" && item.summary.trim()
-              ? item.summary
-              : "Summary not available.",
-          whatIfLow:
-            typeof item.whatIfLow === "string" && item.whatIfLow.trim()
-              ? item.whatIfLow
-              : status === "LOW"
-                ? "Already low in this report."
-                : "If this parameter becomes low, consult a doctor for evaluation.",
-          whatIfHigh:
-            typeof item.whatIfHigh === "string" && item.whatIfHigh.trim()
-              ? item.whatIfHigh
-              : status === "HIGH"
-                ? "Already high in this report."
-                : "If this parameter becomes high, consult a doctor for evaluation.",
-        };
-      });
-    }
+          return {
+            ...item,
+            extractedName: extractedName || fallbackName || normalizedName,
+            expandedName:
+              expandedName || fallbackName || extractedName || normalizedName,
+            name: normalizedName,
+            summary:
+              typeof item.summary === "string" && item.summary.trim()
+                ? item.summary
+                : "Summary not available.",
+            whatIfLow:
+              typeof item.whatIfLow === "string" && item.whatIfLow.trim()
+                ? item.whatIfLow
+                : status === "LOW"
+                  ? "Already low in this report."
+                  : "If this parameter becomes low, consult a doctor for evaluation.",
+            whatIfHigh:
+              typeof item.whatIfHigh === "string" && item.whatIfHigh.trim()
+                ? item.whatIfHigh
+                : status === "HIGH"
+                  ? "Already high in this report."
+                  : "If this parameter becomes high, consult a doctor for evaluation.",
+          };
+        });
+      }
 
-    await db.query("DELETE FROM executive_summary WHERE user_id=$1", [userId]);
-    await db.query("DELETE FROM blood_results WHERE user_id=$1", [userId]);
-
-    const es = parsed.executiveSummary;
-    await db.query(
-      `INSERT INTO executive_summary (user_id, future_outlook, key_focus_areas, dietary_focus, estimated_calories, estimated_protein, lifestyle_advice) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [
+      await db.query("DELETE FROM executive_summary WHERE user_id=$1", [
         userId,
-        es.futureOutlook,
-        JSON.stringify(es.keyFocusAreas),
-        es.dietaryFocus,
-        es.estimatedCalories,
-        es.estimatedProtein,
-        es.lifestyleAdvice,
-      ],
-    );
+      ]);
+      await db.query("DELETE FROM blood_results WHERE user_id=$1", [userId]);
 
-    for (const resItem of parsed.results) {
+      const es = parsed.executiveSummary;
       await db.query(
-        `INSERT INTO blood_results (user_id, extracted_name, expanded_name, test_value, status, issues, why_it_happens, summary, what_if_low, what_if_high) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        `INSERT INTO executive_summary (user_id, future_outlook, key_focus_areas, dietary_focus, estimated_calories, estimated_protein, lifestyle_advice) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [
           userId,
-          resItem.extractedName,
-          resItem.expandedName,
-          resItem.value,
-          resItem.status,
-          resItem.issues,
-          resItem.whyItHappens,
-          resItem.summary,
-          resItem.whatIfLow,
-          resItem.whatIfHigh,
+          es.futureOutlook,
+          JSON.stringify(es.keyFocusAreas),
+          es.dietaryFocus,
+          es.estimatedCalories,
+          es.estimatedProtein,
+          es.lifestyleAdvice,
         ],
       );
+
+      for (const resItem of parsed.results) {
+        await db.query(
+          `INSERT INTO blood_results (user_id, extracted_name, expanded_name, test_value, status, issues, why_it_happens, summary, what_if_low, what_if_high) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+          [
+            userId,
+            resItem.extractedName,
+            resItem.expandedName,
+            resItem.value,
+            resItem.status,
+            resItem.issues,
+            resItem.whyItHappens,
+            resItem.summary,
+            resItem.whatIfLow,
+            resItem.whatIfHigh,
+          ],
+        );
+      }
+
+      const savedSummary = await db.query(
+        "SELECT * FROM executive_summary WHERE user_id=$1",
+        [userId],
+      );
+      const savedResults = await db.query(
+        "SELECT * FROM blood_results WHERE user_id=$1",
+        [userId],
+      );
+
+      const finalData = {
+        executiveSummary: {
+          futureOutlook: savedSummary.rows[0].future_outlook,
+          keyFocusAreas: savedSummary.rows[0].key_focus_areas,
+          dietaryFocus: savedSummary.rows[0].dietary_focus,
+          estimatedCalories: savedSummary.rows[0].estimated_calories,
+          estimatedProtein: savedSummary.rows[0].estimated_protein,
+          lifestyleAdvice: savedSummary.rows[0].lifestyle_advice,
+        },
+        results: savedResults.rows.map((r) => ({
+          extractedName: r.extracted_name,
+          expandedName: r.expanded_name,
+          value: r.test_value,
+          status: r.status,
+          issues: r.issues,
+          whyItHappens: r.why_it_happens,
+          summary: r.summary,
+          whatIfLow: r.what_if_low,
+          whatIfHigh: r.what_if_high,
+        })),
+        dietPlan: parsed.dietPlan,
+        exercisePlan: parsed.exercisePlan,
+        waterIntakePerDay: parsed.waterIntakePerDay,
+        minimumSleepHours: parsed.minimumSleepHours,
+      };
+
+      fs.unlinkSync(imagePath);
+      res.json(finalData);
+    } catch (error) {
+      if (imagePath && fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
+      console.error(error);
+      res.status(500).json({ message: "Analysis failed" });
     }
-
-    const savedSummary = await db.query(
-      "SELECT * FROM executive_summary WHERE user_id=$1",
-      [userId],
-    );
-    const savedResults = await db.query(
-      "SELECT * FROM blood_results WHERE user_id=$1",
-      [userId],
-    );
-
-    const finalData = {
-      executiveSummary: {
-        futureOutlook: savedSummary.rows[0].future_outlook,
-        keyFocusAreas: savedSummary.rows[0].key_focus_areas,
-        dietaryFocus: savedSummary.rows[0].dietary_focus,
-        estimatedCalories: savedSummary.rows[0].estimated_calories,
-        estimatedProtein: savedSummary.rows[0].estimated_protein,
-        lifestyleAdvice: savedSummary.rows[0].lifestyle_advice,
-      },
-      results: savedResults.rows.map((r) => ({
-        extractedName: r.extracted_name,
-        expandedName: r.expanded_name,
-        value: r.test_value,
-        status: r.status,
-        issues: r.issues,
-        whyItHappens: r.why_it_happens,
-        summary: r.summary,
-        whatIfLow: r.what_if_low,
-        whatIfHigh: r.what_if_high,
-      })),
-      dietPlan: parsed.dietPlan,
-      exercisePlan: parsed.exercisePlan,
-      waterIntakePerDay: parsed.waterIntakePerDay,
-      minimumSleepHours: parsed.minimumSleepHours,
-    };
-
-    fs.unlinkSync(imagePath);
-    res.json(finalData);
-  } catch (error) {
-    if (imagePath && fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
-    console.error(error);
-    res.status(500).json({ message: "Analysis failed" });
-  }
-});
+  },
+);
 
 app.get("/get-analysis", async (req, res) => {
   try {
