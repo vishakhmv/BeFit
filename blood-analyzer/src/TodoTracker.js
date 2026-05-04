@@ -15,9 +15,10 @@ function getTodayIndex() {
 export default function TodoTracker() {
   const todayIdx  = getTodayIndex();
   const todayName = DAYS[todayIdx];
+
 // State variables
-  const [tasks, setTasks] = useState([]);
-  const [done, setDone] = useState({});
+  const [tasksByDay, setTasksByDay] = useState({});
+  const [selectedDayIdx, setSelectedDayIdx] = useState(todayIdx);
   const [filter, setFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [noData, setNoData] = useState(false);
@@ -40,38 +41,45 @@ useEffect(() => {
           return;
         }
 
-        const todayDiet = data.diet.filter(d => d.day === todayName); //Today's data
-        const todayExercise = data.exercise.filter(e => e.day === todayName); // Today's exercise
+        const byDay = {};
+        for (const day of DAYS) {
+          const dayDiet     = data.diet.filter(d => d.day === day); //Today's data
+          const dayExercise = data.exercise.filter(e => e.day === day); // Today's exercise
 
-        //Converts each DB diet row into a unified task object
-        const allTasks = [
-          ...todayDiet.map(d => ({
-            id: `diet-${d.id}`,
-            title: d.food,
-            category: "meal",
-            meta: MEAL_LABELS[d.meal_time] || d.meal_time,
-          })),
-          ...todayExercise.map(e => ({
-            id: `ex-${e.id}`,
-            title: e.exercise,
-            category: "exercise",
-            meta: "Today",
-          })),
-          data.water ? {
-            id: "water-1",
-            title: `Drink ${data.water.water}`,
-            category: "hydration",
-            meta: "Throughout the day",
-          } : null,
-          data.sleep ? {
-            id: "sleep-1",
-            title: `Sleep at least ${data.sleep.sleep_hour} hours`,
-            category: "sleep",
-            meta: "Tonight",
-          } : null,
-        ].filter(Boolean);
+          //Converts each DB diet row into a unified task object
+          byDay[day] = [
+            ...dayDiet.map(d => ({
+              id: `diet-${d.id}`,
+              title: d.food,
+              category: "meal",
+              meta: MEAL_LABELS[d.meal_time] || d.meal_time,
+              completed: !!d.completed,
+            })),
+            ...dayExercise.map(e => ({
+              id: `ex-${e.id}`,
+              title: e.exercise,
+              category: "exercise",
+              meta: "Today",
+              completed: !!e.completed,
+            })),
+            data.water ? {
+              id: "water-1",
+              title: `Drink ${data.water.water}`,
+              category: "hydration",
+              meta: "Throughout the day",
+              completed: false,
+            } : null,
+            data.sleep ? {
+              id: "sleep-1",
+              title: `Sleep at least ${data.sleep.sleep_hour} hours`,
+              category: "sleep",
+              meta: "Tonight",
+              completed: false,
+            } : null,
+          ].filter(Boolean);
+        }
 
-        setTasks(allTasks);
+        setTasksByDay(byDay);
         setWater(data.water?.water || "");
         setSleep(data.sleep?.sleep_hour || "");
         setLoading(false); //hides the skeleton loader
@@ -79,7 +87,44 @@ useEffect(() => {
       .catch(() => { setNoData(true); setLoading(false); });
   }, [todayName]); //closes useeffect and sets its dependency
 
-  const toggle = (id) => setDone(prev => ({ ...prev, [id]: !prev[id] }));
+  const toggle = async (id) => {
+    const task = (tasksByDay[todayName] || []).find(t => t.id === id);
+    if (!task) return;
+    const nowCompleted = !task.completed;
+
+    // Optimistic update
+    setTasksByDay(prev => {
+      const dayTasks = (prev[todayName] || []).map(t =>
+        t.id === id ? { ...t, completed: nowCompleted } : t
+      );
+      return { ...prev, [todayName]: dayTasks };
+    });
+
+    // water / sleep are shared rows, no DB column to update
+    if (id === "water-1" || id === "sleep-1") return;
+
+    // diet / exercise → save to DB
+    try {
+      await fetch("http://localhost:5000/toggle-task", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId: id, completed: nowCompleted }),
+      });
+    } catch {
+      // Revert on failure
+      setTasksByDay(prev => {
+        const dayTasks = (prev[todayName] || []).map(t =>
+          t.id === id ? { ...t, completed: !nowCompleted } : t
+        );
+        return { ...prev, [todayName]: dayTasks };
+      });
+    }
+  };
+
+  const selectedDay = DAYS[selectedDayIdx];
+  const isToday     = selectedDayIdx === todayIdx;
+  const tasks       = tasksByDay[selectedDay] || [];
 
   const filtered = filter === "all" ? tasks : tasks.filter(t => t.category === filter);
 
@@ -89,8 +134,9 @@ useEffect(() => {
     return acc;
   }, {});
 
-  const completedCount = tasks.filter(t => done[t.id]).length; //function which checks unchecks a task
-  const total = tasks.length;
+  const todayTasks     = tasksByDay[todayName] || [];
+  const completedCount = todayTasks.filter(t => t.completed).length; //function which checks unchecks a task
+  const total = todayTasks.length;
   const pct = total === 0 ? 0 : Math.round((completedCount / total) * 100);
   const offset = CIRCUMFERENCE - (pct / 100) * CIRCUMFERENCE;
 
@@ -125,14 +171,19 @@ useEffect(() => {
           const isToday  = i === todayIdx;
           const isPast   = i < todayIdx;
           const isFuture = i > todayIdx;
+          const isSelected = i === selectedDayIdx;
           return (
             //{label}-  helps React track which item is which when re-rendering for list items
             <div key={label} className={[
               "tt-day-pill",
+              isSelected ? "tt-day-selected" : "",
               isToday  ? "tt-day-today"  : "",
               isPast   ? "tt-day-past"   : "",
               isFuture ? "tt-day-future" : "",
-            ].join(" ")}>
+            ].join(" ")}
+              onClick={() => setSelectedDayIdx(i)}
+              style={{ cursor: "pointer" }}
+            >
               <span className="tt-day-name">{label}</span>
               {isToday  && <span className="tt-day-dot" />}
               {isPast   && <span className="tt-day-check">✓</span>}
@@ -141,6 +192,40 @@ useEffect(() => {
           );
         })}
       </div>
+
+      {/* Read-only banner when browsing other days */}
+      {!isToday && (
+        <div style={{
+          backgroundColor: "#f5f5f5",
+          border: "1px solid #ddd",
+          borderRadius: "8px",
+          padding: "10px 14px",
+          fontSize: "0.85rem",
+          color: "#999",
+          marginBottom: "12px",
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+        }}>
+          <span>{selectedDayIdx < todayIdx ? "📅" : "🔒"}</span>
+          <span>
+            {selectedDayIdx < todayIdx
+              ? `${DAY_LABELS[selectedDayIdx]} — viewing past day (read‑only)`
+              : `${DAY_LABELS[selectedDayIdx]} — upcoming day (read‑only)`}
+          </span>
+          <button
+            onClick={() => setSelectedDayIdx(todayIdx)}
+            style={{
+              marginLeft: "auto", padding: "4px 10px",
+              borderRadius: "12px", border: "none",
+              backgroundColor: "#2c5f63", color: "white",
+              fontSize: "0.78rem", cursor: "pointer",
+            }}
+          >
+            Go to Today
+          </button>
+        </div>
+      )}
 
       {/* Stats row */}
       {(water || sleep) && (
@@ -194,7 +279,15 @@ useEffect(() => {
       </div>
 
       {/* Task list */}
-      <div className="tt-task-list">
+      <div
+        className="tt-task-list"
+        style={!isToday ? {
+          opacity: 0.45,
+          filter: "grayscale(60%)",
+          pointerEvents: "none",
+          userSelect: "none",
+        } : {}}
+      >
         {Object.keys(grouped).length === 0 && (
           <div className="tt-empty"><p>🌿</p><p>No tasks here</p></div>
         )}
@@ -204,11 +297,12 @@ useEffect(() => {
             {catTasks.map(task => (
               <div
                 key={task.id}
-                className={`tt-task ${done[task.id] ? "tt-task-done" : ""}`}
-                onClick={() => toggle(task.id)}
+                className={`tt-task ${task.completed ? "tt-task-done" : ""}`}
+                onClick={() => isToday && toggle(task.id)}
+                style={{ cursor: isToday ? "pointer" : "default" }}
               >
-                <div className={`tt-check ${done[task.id] ? "tt-check-done" : ""}`}>
-                  {done[task.id] && <span>✓</span>}
+                <div className={`tt-check ${task.completed ? "tt-check-done" : ""}`}>
+                  {task.completed && <span>✓</span>}
                 </div>
                 <span className={`tt-pip tt-pip-${task.category}`} />
                 <div className="tt-task-body">

@@ -6,19 +6,19 @@
   display: flex;
   align-items: flex-start;
   justify-content: flex-end;
-  padding: 64px 24px 0 0;
+  padding: 44px 24px 0 0;
 }
 
 .pf-panel {
   background: #ffffff;
   border-radius: 16px;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15);
-  width: 280px;
+  width: 500px;
   overflow: hidden;
-  transition: width 0.2s ease;
+  max-height: calc(100vh - 80px);
+  display: flex;
+  flex-direction: column;
 }
-
-.pf-expanded { width: 310px; }
 
 .pf-header {
   display: flex;
@@ -26,17 +26,8 @@
   padding: 12px 14px;
   gap: 8px;
   border-bottom: 1px solid #f0f0f0;
+  flex-shrink: 0;
 }
-
-.pf-header-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex: 1;
-  cursor: pointer;
-}
-
-.pf-header-left:hover .pf-name { color: #2c5f63; }
 
 .pf-avatar-wrap { flex-shrink: 0; }
 
@@ -66,12 +57,6 @@
   color: #999;
 }
 
-.pf-chevron {
-  font-size: 0.65rem;
-  color: #bbb;
-  margin-right: 4px;
-}
-
 .pf-x {
   background: none;
   border: none;
@@ -91,6 +76,7 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
+  overflow-y: auto;
   animation: pf-in 0.18s ease;
 }
 
@@ -146,6 +132,11 @@
   font-size: 0.9rem;
   color: #1a1a1a;
   font-weight: 500;
+}
+
+.pf-empty {
+  color: #bbb;
+  font-weight: 400;
 }
 
 .pf-btn-edit {
@@ -216,6 +207,37 @@
   font-size: 0.78rem;
   cursor: pointer;
   color: #999;
+}
+
+.pf-gender-toggle { display: flex; gap: 8px; }
+
+.pf-gender-btn {
+  flex: 1;
+  padding: 9px 6px;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 10px;
+  background: #fafafa;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  color: #555;
+  transition: all 0.15s;
+}
+
+.pf-gender-btn:hover { border-color: #bbb; background: #f3f3f3; }
+
+.pf-gender-btn.active-male {
+  background: #e8f0ff;
+  border-color: #2c5f63;
+  color: #2c5f63;
+  font-weight: 600;
+}
+
+.pf-gender-btn.active-female {
+  background: #fce4ec;
+  border-color: #c2185b;
+  color: #880e4f;
+  font-weight: 600;
 }
 
 .pf-diet-toggle { display: flex; gap: 8px; }

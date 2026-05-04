@@ -83,15 +83,11 @@ app.post("/signup", async (req, res) => {
       return res.status(400).json({ message: "Invalid email format" });
     }
 
-    // 2. Validate WhatsApp Number (Must be exactly 10 digits)
-    const phoneRegex = /^\d{10}$/;
+     const phoneRegex = /^\d{10}$/;
     if (!phoneRegex.test(whatsapp)) {
       return res
         .status(400)
         .json({ message: "WhatsApp number must be exactly 10 digits" });
-    }
-
-    // 3. Validate Date of Birth (Must be a valid date and NOT in the future)
     const dobDate = new Date(dob);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -138,7 +134,6 @@ app.post("/signup", async (req, res) => {
     console.log(error);
     res.status(500).json({ message: "Signup failed" });
   }
-});
 
 app.post("/login", passport.authenticate("local"), (req, res) => {
   res.json({ message: "Login successful", user: req.user });
@@ -1211,6 +1206,7 @@ cron.schedule(
   { scheduled: true, timezone: "Asia/Kolkata" },
 );
 
+<<<<<<< HEAD
 // ============ FORGOT PASSWORD ROUTES ============
 
 // Configure Email Service (Gmail)
@@ -1406,6 +1402,147 @@ app.post("/forgot-password/reset-password", async (req, res) => {
   } catch (error) {
     console.error("Reset Password Error:", error);
     res.status(500).json({ message: "Failed to reset password" });
+=======
+// GET completions for a user
+app.get("/get-completions", async (req, res) => {
+  if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+  try {
+    const result = await db.query(
+      "SELECT task_id, day FROM task_completions WHERE user_id=$1",
+      [req.user.id]
+    );
+    res.json({ completions: result.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch completions" });
+  }
+});
+
+app.post("/toggle-task", async (req, res) => {
+  if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+  try {
+    const { taskId, completed } = req.body;
+    const userId = req.user.id;
+
+    if (taskId.startsWith("diet-")) {
+      const id = taskId.replace("diet-", "");
+      await db.query(
+        "UPDATE diet SET completed=$1 WHERE id=$2 AND user_id=$3",
+        [completed, id, userId]
+      );
+    } else if (taskId.startsWith("ex-")) {
+      const id = taskId.replace("ex-", "");
+      await db.query(
+        "UPDATE exercise SET completed=$1 WHERE id=$2 AND user_id=$3",
+        [completed, id, userId]
+      );
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to toggle task" });
+  }
+});
+
+// TOGGLE a completion
+app.post("/toggle-completion", async (req, res) => {
+  if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+  try {
+    const { taskId, day, completed } = req.body;
+    const userId = req.user.id;
+    if (completed) {
+      await db.query(
+        "INSERT INTO task_completions (user_id, task_id, day) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING",
+        [userId, taskId, day]
+      );
+    } else {
+      await db.query(
+        "DELETE FROM task_completions WHERE user_id=$1 AND task_id=$2 AND day=$3",
+        [userId, taskId, day]
+      );
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to toggle completion" });
+  }
+});
+
+// GET /profile — always read fresh from DB, never trust req.user cache
+app.get("/profile", async (req, res) => {
+  if (!req.isAuthenticated())
+    return res.status(401).json({ message: "Unauthorized" });
+
+  try {
+    const result = await db.query(
+      "SELECT name, food, cstate, sex FROM users WHERE id = $1",
+      [req.user.id]
+    );
+    if (result.rows.length === 0)
+      return res.status(404).json({ message: "User not found" });
+
+    const { name, food, cstate, sex } = result.rows[0];  // ← sex must be here
+
+    res.json({
+      name: name || "",
+      diet_preference: food || null,
+      state: cstate || "",
+      sex: sex || null,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch profile" });
+  }
+});
+
+// POST /profile/update — update DB then re-sync the Passport session
+app.post("/profile/update", async (req, res) => {
+  if (!req.isAuthenticated())
+    return res.status(401).json({ message: "Unauthorized" });
+
+  const userId = req.user.id;
+  const { name, diet_preference, state } = req.body;
+
+  const fields = [];
+  const values = [];
+  let i = 1;
+
+  if (name !== undefined && name.trim() !== "") {
+    fields.push(`name = $${i++}`);
+    values.push(name.trim());
+  }
+  if (diet_preference !== undefined) {
+    fields.push(`food = $${i++}`);
+    values.push(diet_preference);
+  }
+  if (state !== undefined) {
+    fields.push(`cstate = $${i++}`);
+    values.push(state);
+  }
+
+  if (fields.length === 0)
+    return res.status(400).json({ message: "No fields to update" });
+
+  try {
+    values.push(userId);
+    await db.query(
+      `UPDATE users SET ${fields.join(", ")} WHERE id = $${i}`,
+      values
+    );
+
+    // Re-fetch the updated row and write it back into the Passport session
+    // so req.user stays consistent for the rest of the session
+    const fresh = await db.query("SELECT * FROM users WHERE id = $1", [userId]);
+    await new Promise((resolve, reject) => {
+      req.login(fresh.rows[0], (err) => (err ? reject(err) : resolve()));
+    });
+
+    res.json({ message: "Profile updated" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to update profile" });
+>>>>>>> 03d2bcd (added gender input box in signup page,  profile section updated and removed some bugs)
   }
 });
 

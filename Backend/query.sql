@@ -17,14 +17,16 @@ CREATE TABLE diet (
     user_id INT REFERENCES users(id),
     day VARCHAR(20),
     meal_time VARCHAR(10),
-    food TEXT
+    food TEXT,
+    completed BOOLEAN DEFAULT FALSE
 );
  
 CREATE TABLE exercise (
     id SERIAL PRIMARY KEY,
     user_id INT REFERENCES users(id),
     day VARCHAR(20),
-    exercise TEXT
+    exercise TEXT,
+    completed BOOLEAN DEFAULT FALSE
 );
  
 CREATE TABLE sleep (

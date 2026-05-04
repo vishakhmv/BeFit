@@ -119,14 +119,12 @@ export default function Home() {
             justifyContent: "flex-end",
           }}
         >
-          <span>About us</span>
-          <span>Help & Support</span>
           <span
             onClick={() => setIsProfileOpen(true)}
             style={{ cursor: "pointer", display: "flex", alignItems: "center" }}
             title="Profile"
           >
-            <svg viewBox="0 0 32 32" width="30" height="30">
+            <svg viewBox="0 0 32 32" width="38" height="38">
               <circle cx="16" cy="16" r="16" fill="#2c5f63" />
               <circle cx="16" cy="12" r="5" fill="rgba(255,255,255,0.9)" />
               <ellipse
@@ -196,20 +194,23 @@ export default function Home() {
                         flexWrap: "wrap",
                       }}
                     >
-                      <input
-                        placeholder="Height (cm)"
-                        value={userData.height}
-                        onChange={(e) =>
-                          setUserData({ ...userData, height: e.target.value })
-                        }
-                      />
-                      <input
-                        placeholder="Weight (kg)"
-                        value={userData.weight}
-                        onChange={(e) =>
-                          setUserData({ ...userData, weight: e.target.value })
-                        }
-                      />
+                     
+  <input
+    style={{ width: "26rem", display: "block", margin: "0 auto 1rem auto" }}
+    placeholder="Height (cm)"
+    value={userData.height}
+    onChange={(e) =>
+      setUserData({ ...userData, height: e.target.value })
+    }
+  />
+  <input
+    style={{ width: "26rem", display: "block", margin: "0 auto 1rem auto" }}
+    placeholder="Weight (kg)"
+    value={userData.weight}
+    onChange={(e) =>
+      setUserData({ ...userData, weight: e.target.value })
+    }
+  />
                     </div>
 
                     <button

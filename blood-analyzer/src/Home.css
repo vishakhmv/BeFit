@@ -107,19 +107,20 @@
 
 .clear-btn {
   margin: 0 auto 12px;
+  margin-top: 20px;
   width: 200px;
   padding: 10px;
   border-radius: 14px;
   border: none;
-  background: #e3e3e3;
-  color: #333;
+background-color: #24ad15;
+color: white;
+
   font-weight: 600;
   cursor: pointer;
-}
+}   
 
 .clear-btn:hover {
-  background: #d0d0d0;
-}
+  background-color: #1c8510;}
 
 .clear-btn:disabled {
   opacity: 0.5;
