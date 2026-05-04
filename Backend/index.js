@@ -11,6 +11,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import twilio from "twilio";
 import cron from "node-cron";
+import nodemailer from "nodemailer";
 // Load the hidden variables from your .env file
 dotenv.config();
 
@@ -111,9 +112,11 @@ app.post("/signup", async (req, res) => {
           console.error(err);
           res.status(500).json({ message: "Signup failed" });
         } else {
+          // Add country code for Twilio WhatsApp
+          const whatsappNumber = "+91" + whatsapp;
           const insertResult = await db.query(
             "INSERT INTO users (name, email, password, dob, whatsapp_number, sex, food, cstate) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *",
-            [name, email, hash, dob, whatsapp, sex, food, state],
+            [name, email, hash, dob, whatsappNumber, sex, food, state],
           );
 
           const user = insertResult.rows[0];
@@ -777,7 +780,7 @@ app.post("/save-tracker", async (req, res) => {
 
     // 6. Update data and analysis_date
     await db.query(
-      "UPDATE users SET cdata = 1, analysis_date = NOW() WHERE id = $1",
+      "UPDATE users SET data = 1, analysis_date = NOW() WHERE id = $1",
       [userId],
     );
 
@@ -807,7 +810,7 @@ async function deleteExpiredData() {
       ]);
       await db.query("DELETE FROM blood_results WHERE user_id=$1", [userId]);
 
-      await db.query("UPDATE users SET cdata = 0 WHERE id=$1", [userId]);
+      await db.query("UPDATE users SET data = 0 WHERE id=$1", [userId]);
     }
 
     console.log("Expired user tracker data cleaned");
@@ -826,12 +829,12 @@ app.get("/get-tracker", async (req, res) => {
     const userId = req.user.id;
 
     // check data flag first
-    const userResult = await db.query("SELECT cdata FROM users WHERE id=$1", [
+    const userResult = await db.query("SELECT data FROM users WHERE id=$1", [
       userId,
     ]);
     const user = userResult.rows[0];
 
-    if (!user || user.cdata === 0) {
+    if (!user || user.data === 0) {
       return res.json({ hasData: false });
     }
 
@@ -882,7 +885,7 @@ const formatList = (items, fallback) => {
 
 const getUsersWithWhatsapp = async () => {
   const users = await db.query(
-    "SELECT id, name, whatsapp_number FROM users WHERE whatsapp_number IS NOT NULL AND cdata = 1",
+    "SELECT id, name, whatsapp_number FROM users WHERE whatsapp_number IS NOT NULL AND data = 1",
   );
   return users.rows;
 };
@@ -1187,6 +1190,198 @@ cron.schedule(
   },
   { scheduled: true, timezone: "Asia/Kolkata" },
 );
+
+// ============ FORGOT PASSWORD ROUTES ============
+
+// Configure Email Service (Gmail)
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASSWORD,
+  },
+});
+
+// Generate OTP
+function generateOTP() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+// Route 1: Send OTP to Email
+app.post("/forgot-password/send-otp", async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    // Security: Check if user exists (silently - don't reveal)
+    const userResult = await db.query("SELECT id FROM users WHERE email = $1", [
+      email,
+    ]);
+
+    // Always return success message to prevent email enumeration
+    // This prevents attackers from discovering registered emails
+    if (userResult.rows.length === 0) {
+      // Email not registered, but we don't tell the user
+      return res.json({ 
+        message: "If this email is registered with us, you'll receive an OTP shortly. Please check your inbox and spam folder." 
+      });
+    }
+
+    // Email exists - proceed with OTP
+    // Generate OTP
+    const otp = generateOTP();
+
+    // Delete old OTP if exists
+    await db.query("DELETE FROM password_reset_otp WHERE email = $1", [email]);
+
+    // Store OTP in database
+    await db.query(
+      "INSERT INTO password_reset_otp (email, otp, expires_at) VALUES ($1, $2, NOW() + INTERVAL '10 minutes')",
+      [email, otp],
+    );
+
+    // Send OTP via email
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: "BeFit Password Reset OTP",
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #4824ea;">Password Reset Request</h2>
+          <p>Hello,</p>
+          <p>You requested to reset your BeFit password. Here's your OTP:</p>
+          <div style="background-color: #f0f0f0; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0;">
+            <h1 style="color: #4824ea; letter-spacing: 5px; margin: 0;">${otp}</h1>
+          </div>
+          <p><strong>This OTP is valid for 10 minutes.</strong></p>
+          <p>If you didn't request this, please ignore this email.</p>
+          <p>Best regards,<br/>BeFit Team</p>
+        </div>
+      `,
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    res.json({ 
+      message: "If this email is registered with us, you'll receive an OTP shortly. Please check your inbox and spam folder." 
+    });
+  } catch (error) {
+    console.error("Send OTP Error:", error);
+    res.status(500).json({ message: "Failed to send OTP" });
+  }
+});
+
+// Route 2: Verify OTP
+app.post("/forgot-password/verify-otp", async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+      return res.status(400).json({ message: "Email and OTP are required" });
+    }
+
+    // Check if OTP exists and is not expired
+    const otpResult = await db.query(
+      "SELECT * FROM password_reset_otp WHERE email = $1 AND otp = $2 AND expires_at > NOW()",
+      [email, otp],
+    );
+
+    if (otpResult.rows.length === 0) {
+      return res.status(400).json({ message: "Invalid or expired OTP" });
+    }
+
+    // Mark OTP as verified
+    await db.query(
+      "UPDATE password_reset_otp SET is_verified = TRUE WHERE email = $1 AND otp = $2",
+      [email, otp],
+    );
+
+    res.json({ message: "OTP verified successfully" });
+  } catch (error) {
+    console.error("Verify OTP Error:", error);
+    res.status(500).json({ message: "Failed to verify OTP" });
+  }
+});
+
+// Route 3: Reset Password
+app.post("/forgot-password/reset-password", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password are required" });
+    }
+
+    // Check if OTP was verified
+    const otpResult = await db.query(
+      "SELECT * FROM password_reset_otp WHERE email = $1 AND is_verified = TRUE AND expires_at > NOW()",
+      [email],
+    );
+
+    if (otpResult.rows.length === 0) {
+      return res
+        .status(400)
+        .json({ message: "OTP not verified or expired. Please request a new OTP." });
+    }
+
+    // Check if user exists
+    const userResult = await db.query("SELECT * FROM users WHERE email = $1", [
+      email,
+    ]);
+
+    if (userResult.rows.length === 0) {
+      return res.status(400).json({ message: "User not found" });
+    }
+
+    // Hash new password
+    bcrypt.hash(password, saltRounds, async (err, hash) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ message: "Failed to reset password" });
+      }
+
+      try {
+        // Update password in database
+        await db.query("UPDATE users SET password = $1 WHERE email = $2", [
+          hash,
+          email,
+        ]);
+
+        // Delete used OTP
+        await db.query("DELETE FROM password_reset_otp WHERE email = $1", [email]);
+
+        // Send confirmation email
+        const mailOptions = {
+          from: process.env.EMAIL_USER,
+          to: email,
+          subject: "BeFit Password Changed Successfully",
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #4824ea;">Password Changed Successfully</h2>
+              <p>Hello,</p>
+              <p>Your BeFit password has been successfully changed.</p>
+              <p>If you didn't make this change, please contact our support team immediately.</p>
+              <p>Best regards,<br/>BeFit Team</p>
+            </div>
+          `,
+        };
+
+        await transporter.sendMail(mailOptions);
+
+        res.json({ message: "Password reset successfully" });
+      } catch (error) {
+        console.error("Password Update Error:", error);
+        res.status(500).json({ message: "Failed to reset password" });
+      }
+    });
+  } catch (error) {
+    console.error("Reset Password Error:", error);
+    res.status(500).json({ message: "Failed to reset password" });
+  }
+});
 
 app.listen(port, () => {
   console.log(`Your app is listening to port ${port}`);

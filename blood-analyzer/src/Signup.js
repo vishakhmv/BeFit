@@ -29,7 +29,7 @@ export default function Signup() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ name, email, dob, whatsapp: "+91" + whatsapp, Preference, State, password}),
+        body: JSON.stringify({ name, email, dob, whatsapp, Preference, State, password}),
       });
 
       const data = await response.json();

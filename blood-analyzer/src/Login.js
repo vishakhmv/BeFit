@@ -1,10 +1,12 @@
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import "./Login.css";
+import ForgotPassword from "./ForgotPassword";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const navigate = useNavigate();
 
   const handleLogin = async () => {
@@ -41,11 +43,15 @@ export default function Login() {
         <input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)}/>
         <input placeholder="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)}/>
         <button className="final-login" onClick={handleLogin}>Log in</button>
+        <button className="forgot-password-link" onClick={() => setShowForgotPassword(true)}>
+          Forgot Password?
+        </button>
       </div>
       <div className="hero-image">
         <img src="/heroimage.jpg" alt="Health" />
       </div>
     </div>
+    {showForgotPassword && <ForgotPassword onClose={() => setShowForgotPassword(false)} />}
     </>
   );
 }

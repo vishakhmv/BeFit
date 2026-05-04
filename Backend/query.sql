@@ -63,3 +63,12 @@ CREATE TABLE blood_results (
     what_if_low TEXT,
     what_if_high TEXT
 );
+
+CREATE TABLE password_reset_otp (
+    id SERIAL PRIMARY KEY,
+    email VARCHAR(150) NOT NULL,
+    otp VARCHAR(6) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP + INTERVAL '10 minutes',
+    is_verified BOOLEAN DEFAULT FALSE
+);
