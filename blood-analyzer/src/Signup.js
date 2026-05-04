@@ -13,8 +13,6 @@ export default function Signup() {
   const [state, setState] = useState("");
   const foods = ["Veg", "Non-Veg"];
   const [sex, setSex] = useState("");
-  const [food, setfood] = useState("");
-  const [State, setState] = useState("");
   const indianStates = ["Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chhattisgarh","Goa","Gujarat","Haryana","Himachal Pradesh",
   "Jharkhand","Karnataka","Kerala","Madhya Pradesh","Maharashtra","Manipur","Meghalaya","Mizoram","Nagaland","Odisha","Punjab","Rajasthan","Sikkim",
   "Tamil Nadu","Telangana","Tripura","Uttar Pradesh","Uttarakhand","West Bengal"];
@@ -33,8 +31,7 @@ export default function Signup() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ name, email, dob, whatsapp, food, state, password}),
-        body: JSON.stringify({ name, email, dob, whatsapp: "+91" + whatsapp, sex, food, state : State, password}),
+        body: JSON.stringify({ name, email, dob, whatsapp, sex, food, state, password}),
       });
 
       const data = await response.json();

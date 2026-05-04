@@ -83,11 +83,15 @@ app.post("/signup", async (req, res) => {
       return res.status(400).json({ message: "Invalid email format" });
     }
 
-     const phoneRegex = /^\d{10}$/;
+    // 2. Validate WhatsApp Number (Must be exactly 10 digits)
+    const phoneRegex = /^\d{10}$/;
     if (!phoneRegex.test(whatsapp)) {
       return res
         .status(400)
         .json({ message: "WhatsApp number must be exactly 10 digits" });
+    }
+
+    // 3. Validate Date of Birth (Must be a valid date and NOT in the future)
     const dobDate = new Date(dob);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -134,7 +138,7 @@ app.post("/signup", async (req, res) => {
     console.log(error);
     res.status(500).json({ message: "Signup failed" });
   }
-
+});
 app.post("/login", passport.authenticate("local"), (req, res) => {
   res.json({ message: "Login successful", user: req.user });
 });
@@ -669,21 +673,18 @@ food: ${dbUser.food}
 // --- UPDATED /get-analysis ROUTE ---
 app.get("/get-analysis", async (req, res) => {
   try {
-    if (!req.isAuthenticated())
+    if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Unauthorized" });
-
-    const data = await getAnalysisFromDB(req.user.id);
-
-    if (!data) {
-      return res
-        .status(404)
-        .json({ message: "No saved analysis found for this user." });
     }
-
-    res.json(data);
+    // You need to call your helper function here!
+    const finalData = await getAnalysisFromDB(req.user.id);
+    if (!finalData) {
+      return res.status(404).json({ message: "No analysis found." });
+    }
+    res.json(finalData);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Failed to fetch saved analysis" });
+    res.status(500).json({ message: "Failed to fetch analysis" });
   }
 });
 app.post("/save-tracker", async (req, res) => {
@@ -1206,8 +1207,6 @@ cron.schedule(
   { scheduled: true, timezone: "Asia/Kolkata" },
 );
 
-<<<<<<< HEAD
-// ============ FORGOT PASSWORD ROUTES ============
 
 // Configure Email Service (Gmail)
 const transporter = nodemailer.createTransport({
@@ -1402,7 +1401,8 @@ app.post("/forgot-password/reset-password", async (req, res) => {
   } catch (error) {
     console.error("Reset Password Error:", error);
     res.status(500).json({ message: "Failed to reset password" });
-=======
+  }
+});
 // GET completions for a user
 app.get("/get-completions", async (req, res) => {
   if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
@@ -1542,7 +1542,6 @@ app.post("/profile/update", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Failed to update profile" });
->>>>>>> 03d2bcd (added gender input box in signup page,  profile section updated and removed some bugs)
   }
 });
 

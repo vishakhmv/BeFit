@@ -71,6 +71,9 @@
   cursor: pointer;
 }
 
+.section-title-h2{
+  margin-top: 3rem;
+}
 
 .drop-zone {
   position: absolute;

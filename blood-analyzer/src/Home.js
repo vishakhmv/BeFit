@@ -163,7 +163,7 @@ export default function Home() {
               {/* IF NO RESULT: SHOW UPLOAD BOX */}
               {!result && (
                 <div>
-                  <h2>Upload Your Blood Report</h2>
+                  <h2 class="section-title-h2">Upload Your Blood Report</h2>
                   <div className="card">
                     <div
                       className="upload-box"
