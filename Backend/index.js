@@ -780,7 +780,7 @@ app.post("/save-tracker", async (req, res) => {
 
     // 6. Update data and analysis_date
     await db.query(
-      "UPDATE users SET data = 1, analysis_date = NOW() WHERE id = $1",
+      "UPDATE users SET cdata = 1, analysis_date = NOW() WHERE id = $1",
       [userId],
     );
 
@@ -810,7 +810,7 @@ async function deleteExpiredData() {
       ]);
       await db.query("DELETE FROM blood_results WHERE user_id=$1", [userId]);
 
-      await db.query("UPDATE users SET data = 0 WHERE id=$1", [userId]);
+      await db.query("UPDATE users SET cdata = 0 WHERE id=$1", [userId]);
     }
 
     console.log("Expired user tracker data cleaned");
@@ -829,12 +829,12 @@ app.get("/get-tracker", async (req, res) => {
     const userId = req.user.id;
 
     // check data flag first
-    const userResult = await db.query("SELECT data FROM users WHERE id=$1", [
+    const userResult = await db.query("SELECT cdata FROM users WHERE id=$1", [
       userId,
     ]);
     const user = userResult.rows[0];
 
-    if (!user || user.data === 0) {
+    if (!user || user.cdata === 0) {
       return res.json({ hasData: false });
     }
 
@@ -885,7 +885,7 @@ const formatList = (items, fallback) => {
 
 const getUsersWithWhatsapp = async () => {
   const users = await db.query(
-    "SELECT id, name, whatsapp_number FROM users WHERE whatsapp_number IS NOT NULL AND data = 1",
+    "SELECT id, name, whatsapp_number FROM users WHERE whatsapp_number IS NOT NULL AND cdata = 1",
   );
   return users.rows;
 };
@@ -1225,8 +1225,9 @@ app.post("/forgot-password/send-otp", async (req, res) => {
     // This prevents attackers from discovering registered emails
     if (userResult.rows.length === 0) {
       // Email not registered, but we don't tell the user
-      return res.json({ 
-        message: "If this email is registered with us, you'll receive an OTP shortly. Please check your inbox and spam folder." 
+      return res.json({
+        message:
+          "If this email is registered with us, you'll receive an OTP shortly. Please check your inbox and spam folder.",
       });
     }
 
@@ -1265,8 +1266,9 @@ app.post("/forgot-password/send-otp", async (req, res) => {
 
     await transporter.sendMail(mailOptions);
 
-    res.json({ 
-      message: "If this email is registered with us, you'll receive an OTP shortly. Please check your inbox and spam folder." 
+    res.json({
+      message:
+        "If this email is registered with us, you'll receive an OTP shortly. Please check your inbox and spam folder.",
     });
   } catch (error) {
     console.error("Send OTP Error:", error);
@@ -1312,7 +1314,9 @@ app.post("/forgot-password/reset-password", async (req, res) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ message: "Email and password are required" });
+      return res
+        .status(400)
+        .json({ message: "Email and password are required" });
     }
 
     // Check if OTP was verified
@@ -1324,7 +1328,9 @@ app.post("/forgot-password/reset-password", async (req, res) => {
     if (otpResult.rows.length === 0) {
       return res
         .status(400)
-        .json({ message: "OTP not verified or expired. Please request a new OTP." });
+        .json({
+          message: "OTP not verified or expired. Please request a new OTP.",
+        });
     }
 
     // Check if user exists
@@ -1351,7 +1357,9 @@ app.post("/forgot-password/reset-password", async (req, res) => {
         ]);
 
         // Delete used OTP
-        await db.query("DELETE FROM password_reset_otp WHERE email = $1", [email]);
+        await db.query("DELETE FROM password_reset_otp WHERE email = $1", [
+          email,
+        ]);
 
         // Send confirmation email
         const mailOptions = {

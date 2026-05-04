@@ -9,8 +9,8 @@ export default function Signup() {
   const [dob, setDob] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const foodPreferences = ["Veg", "Non-Veg"];
-  const [Preference, setPreference] = useState("");
-  const [State, setState] = useState("");
+  const [food, setPreference] = useState("");
+  const [state, setState] = useState("");
   const indianStates = ["Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chhattisgarh","Goa","Gujarat","Haryana","Himachal Pradesh",
   "Jharkhand","Karnataka","Kerala","Madhya Pradesh","Maharashtra","Manipur","Meghalaya","Mizoram","Nagaland","Odisha","Punjab","Rajasthan","Sikkim",
   "Tamil Nadu","Telangana","Tripura","Uttar Pradesh","Uttarakhand","West Bengal"];
@@ -29,7 +29,7 @@ export default function Signup() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ name, email, dob, whatsapp, Preference, State, password}),
+        body: JSON.stringify({ name, email, dob, whatsapp, food, state, password}),
       });
 
       const data = await response.json();
@@ -83,7 +83,7 @@ export default function Signup() {
             maxLength="10" 
             required 
           />
-          <select value={Preference} onChange={(e) => setPreference(e.target.value)}>
+          <select value={food} onChange={(e) => setPreference(e.target.value)}>
             <option value="">Select Food Preference</option>
             {foodPreferences.map((item, index) => (
               <option key={index} value={item}>
@@ -91,7 +91,7 @@ export default function Signup() {
               </option>
             ))}
           </select>
-          <select value={State} onChange={(e) => setState(e.target.value)}>
+          <select value={state} onChange={(e) => setState(e.target.value)}>
             <option value="">Select State</option>
             {indianStates.map((state, index) => (
               <option key={index} value={state}>
