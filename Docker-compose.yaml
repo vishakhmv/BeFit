@@ -14,17 +14,19 @@ services:
       - "5000:5000"
     environment:
       - DB_HOST=db
-      - DB_USER=root
-      - DB_PASSWORD=example
+      - DB_USER=postgres
+      - DB_PASSWORD=password
       - DB_NAME=befit
     depends_on:
       - db
 
   db:
-  image: postgres:15
-  environment:
-    POSTGRES_USER: postgres
-    POSTGRES_PASSWORD: password
-    POSTGRES_DB: befit
-  ports:
-    - "5432:5432"
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: befit
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./backend/query.sql:/docker-entrypoint-initdb.d/init.sql
