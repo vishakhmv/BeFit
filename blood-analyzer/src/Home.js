@@ -24,7 +24,6 @@ export default function Home() {
     gender: "",
     height: "",
     weight: "",
-    medicines: "",
   });
 
   // Teammate's Auth Check
@@ -73,9 +72,6 @@ export default function Home() {
     formData.append("report", files[0]);
     formData.append("height", userData.height);
     formData.append("weight", userData.weight);
-    formData.append("age", 22);
-    formData.append("gender", "male");
-    formData.append("medicines", "none");
 
     try {
       setLoading(true);

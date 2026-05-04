@@ -448,13 +448,21 @@ app.post(
         return res.status(400).json({ message: "No file uploaded." });
 
       const userId = req.user.id;
+      const userRecord = await db.query(
+        "SELECT dob, sex, cstate, food FROM users WHERE id = $1",
+        [userId],
+      );
+      const dbUser = userRecord.rows[0];
+      const calculateAge = (dob) =>
+        Math.floor((new Date() - new Date(dob).getTime()) / 3.15576e10);
+
       const userDetails = `
-Age: ${req.body.age}
-Gender: ${req.body.gender}
-Height: ${req.body.height}
-Weight: ${req.body.weight}
-State: ${req.body.state}
-Dietary Preference (Veg/Non-Veg): ${req.body.food}
+Age: ${calculateAge(dbUser.dob)}
+Gender: ${dbUser.sex}
+Height: ${req.body.height} 
+Weight: ${req.body.weight} 
+State: ${dbUser.cstate}
+food: ${dbUser.food}
 `;
 
       imagePath = req.file.path;
@@ -468,8 +476,20 @@ Dietary Preference (Veg/Non-Veg): ${req.body.food}
       ]);
 
       const aiResponse = result.response.text();
-      const clean = aiResponse.replace(/```json|```/g, "");
-      const parsed = JSON.parse(clean);
+      let parsed;
+      try {
+        const clean = aiResponse.replace(/```json|```/g, "").trim();
+        parsed = JSON.parse(clean);
+      } catch (parseError) {
+        console.error("Failed to parse Gemini output:");
+        if (imagePath && fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
+        return res
+          .status(500)
+          .json({
+            message:
+              "AI generated an invalid response format. Please try again.",
+          });
+      }
 
       if (parsed.error) {
         fs.unlinkSync(imagePath);
@@ -1326,11 +1346,9 @@ app.post("/forgot-password/reset-password", async (req, res) => {
     );
 
     if (otpResult.rows.length === 0) {
-      return res
-        .status(400)
-        .json({
-          message: "OTP not verified or expired. Please request a new OTP.",
-        });
+      return res.status(400).json({
+        message: "OTP not verified or expired. Please request a new OTP.",
+      });
     }
 
     // Check if user exists
