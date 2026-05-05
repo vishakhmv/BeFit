@@ -1,0 +1,8 @@
+services:
+  frontend:
+    image: firestorm8142/befit-frontend:latest
+    build: null
+
+  backend:
+    image: firestorm8142/befit-backend:latest
+    build: null
