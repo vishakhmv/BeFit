@@ -10,13 +10,8 @@ export default function Home() {
   const [files, setFiles] = useState([]);
   const [view, setView] = useState("dashboard");
   const [dashboardTab, setDashboardTab] = useState("overview");
-
-  // Your ChatBot state
   const [isChatOpen, setIsChatOpen] = useState(false);
-  //profile state
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-
-  // Teammate's Upload & Auth state
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [userData, setUserData] = useState({
@@ -98,7 +93,7 @@ export default function Home() {
       setLoading(false);
     }
   };
-  // Helper function for the color badges
+  
   const getBadgeClass = (status) => {
     if (status === "NORMAL") return "badge normal";
     if (status === "LOW") return "badge low";
