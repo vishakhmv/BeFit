@@ -30,3 +30,8 @@ services:
       - "5432:5432"
     volumes:
       - ./backend/query.sql:/docker-entrypoint-initdb.d/init.sql
+
+# When building images/starting containers for first time, run: "docker-compose up --build", make sure docker desktop is open
+
+# run: "docker-compose up" to build the images and start the containers locally on your machine
+# run: "docker-compose -f Docker-compose.yaml -f Docker.compose.prod.yaml up" to pull the containers from my repo and run it.
