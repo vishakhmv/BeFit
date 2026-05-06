@@ -46,10 +46,68 @@
     box-shadow 0.3s ease;
 }
 
+.input-group {
+  display: flex;
+  gap: 0.8rem;
+  align-items: center;
+}
+
+.input-group input {
+  flex: 1;
+  width: auto;
+  padding: 12px 16px;
+  border: 1px solid #717171;
+  border-radius: 12px;
+  font-size: 1rem;
+  outline: none;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.input-group {
+  display: flex;
+  gap: 0.8rem;
+  align-items: center;
+}
+
+.input-group input {
+  flex: 1;
+  width: auto;
+  padding: 12px 16px;
+  border: 1px solid #717171;
+  border-radius: 12px;
+  font-size: 1rem;
+  outline: none;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.input-group input:focus {
+  border-color: #2c5f63;
+  box-shadow: 0 0 0 3px rgba(44, 95, 99, 0.1);
+}
+
+.verify-btn {
+  padding: 12px 20px !important;
+  background-color: #2c5f63 !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 8px !important;
+  font-size: 0.95rem !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  white-space: nowrap;
+  transition: background-color 0.3s ease, box-shadow 0.15s ease;
+}
+
+.verify-btn:hover {
+  background-color: #1e4447 !important;
+  box-shadow: -4px 4px 0 rgba(0, 0, 0, 0.2);
+  transform: translate(1px, -1px);
+}
+
 .signup-form input:focus,
 .signup-form select:focus {
-  border-color: #2ecc71;
-  box-shadow: 0 0 0 3px rgba(46, 204, 113, 0.1);
+  border-color: #2c5f63;
+  box-shadow: 0 0 0 3px rgba(44, 95, 99, 0.1);
 }
 
 .signup-form button {
@@ -62,11 +120,129 @@
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
+  transition: background-color 0.3s ease, box-shadow 0.15s ease;
 }
 
 .signup-form button:hover {
-  background: #1f4245;
+  background-color: #1e4447;
   box-shadow: -6px 6px 0 rgba(0, 0, 0, 0.4);
   transform: translate(1px, -1px);
-  transition: box-shadow 0.15s ease;
+}
+
+/* Email Verification Modal */
+.email-verification-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.email-verification-modal {
+  background: white;
+  padding: 30px;
+  border-radius: 12px;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  position: relative;
+}
+
+.email-verification-modal h2 {
+  margin-bottom: 15px;
+  color: #333;
+  font-size: 1.5rem;
+}
+
+.email-verification-modal .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.email-verification-modal .form-group p {
+  margin: 0;
+  color: #555;
+  font-size: 0.95rem;
+}
+
+.email-verification-modal input {
+  padding: 12px 16px;
+  border: 1px solid #717171;
+  border-radius: 8px;
+  font-size: 1rem;
+  outline: none;
+  transition: border-color 0.3s ease;
+}
+
+.email-verification-modal input:focus {
+  border-color: #2c5f63;
+  box-shadow: 0 0 0 3px rgba(44, 95, 99, 0.1);
+}
+
+.close-btn {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: none;
+  border: none;
+  font-size: 1.8rem;
+  cursor: pointer;
+  color: #333;
+}
+
+.close-btn:hover {
+  color: #2c5f63;
+}
+
+.btn-primary {
+  padding: 12px;
+  background-color: #2c5f63;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: #1e4447;
+}
+
+.btn-primary:disabled {
+  background-color: #999;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  padding: 12px;
+  background-color: #f0f0f0;
+  color: #333;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.btn-secondary:hover {
+  background-color: #e0e0e0;
+}
+
+.verify-btn.verified {
+  background-color: #27ae60 !important;
+  cursor: default;
+}
+
+.verify-btn:disabled {
+  background-color: #999;
+  cursor: not-allowed;
 }

@@ -69,6 +69,172 @@ const twilioClient = twilio(
   process.env.TWILIO_AUTH_TOKEN,
 );
 
+// Setup Nodemailer for email OTP
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASSWORD,
+  },
+});
+
+// Generate OTP
+function generateOtp() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+// Send Email OTP
+app.post("/send-email-otp", async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    const otp = generateOtp();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    // Check if email already exists
+    const userCheck = await db.query("SELECT * FROM users WHERE email = $1", [email]);
+    if (userCheck.rows.length > 0) {
+      return res.status(400).json({ message: "Email already registered" });
+    }
+
+    // Insert OTP into signup_verification_otp table
+    await db.query(
+      "INSERT INTO signup_verification_otp (email, otp, verification_type, expires_at) VALUES ($1, $2, $3, $4)",
+      [email, otp, 'email', expiresAt]
+    );
+
+    // Send email
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: "BeFit Email Verification OTP",
+      html: `<h2>Your BeFit Email Verification Code</h2>
+             <p>Your OTP is: <strong>${otp}</strong></p>
+             <p>This code will expire in 10 minutes.</p>`,
+    };
+
+    await transporter.sendMail(mailOptions);
+    res.json({ message: "OTP sent successfully" });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Failed to send OTP" });
+  }
+});
+
+// Verify Email OTP
+app.post("/verify-email-otp", async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+      return res.status(400).json({ message: "Email and OTP required" });
+    }
+
+    const result = await db.query(
+      "SELECT * FROM signup_verification_otp WHERE email = $1 AND otp = $2 AND verification_type = $3",
+      [email, otp, 'email']
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({ message: "Invalid OTP" });
+    }
+
+    const record = result.rows[0];
+    if (new Date() > new Date(record.expires_at)) {
+      return res.status(400).json({ message: "OTP has expired" });
+    }
+
+    // Mark as verified
+    await db.query(
+      "UPDATE signup_verification_otp SET is_verified = TRUE WHERE email = $1 AND verification_type = $2",
+      [email, 'email']
+    );
+
+    res.json({ message: "Email verified successfully" });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Verification failed" });
+  }
+});
+
+// Send WhatsApp OTP
+app.post("/send-whatsapp-otp", async (req, res) => {
+  try {
+    const { whatsapp } = req.body;
+
+    if (!whatsapp) {
+      return res.status(400).json({ message: "WhatsApp number is required" });
+    }
+
+    const phoneRegex = /^\d{10}$/;
+    if (!phoneRegex.test(whatsapp)) {
+      return res.status(400).json({ message: "Invalid WhatsApp number" });
+    }
+
+    const otp = generateOtp();
+    const whatsappNumber = "+91" + whatsapp;
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    // Send WhatsApp message via Twilio
+    await twilioClient.messages.create({
+      from: `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`,
+      to: `whatsapp:${whatsappNumber}`,
+      body: `Your BeFit WhatsApp verification code is: ${otp}\nCode expires in 10 minutes.`,
+    });
+
+    // Store OTP in database
+    await db.query(
+      "INSERT INTO signup_verification_otp (whatsapp, otp, verification_type, expires_at) VALUES ($1, $2, $3, $4)",
+      [whatsapp, otp, 'whatsapp', expiresAt]
+    );
+
+    res.json({ message: "OTP sent to WhatsApp" });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Failed to send WhatsApp OTP" });
+  }
+});
+
+// Verify WhatsApp OTP
+app.post("/verify-whatsapp-otp", async (req, res) => {
+  try {
+    const { whatsapp, otp } = req.body;
+
+    if (!whatsapp || !otp) {
+      return res.status(400).json({ message: "WhatsApp number and OTP required" });
+    }
+
+    const result = await db.query(
+      "SELECT * FROM signup_verification_otp WHERE whatsapp = $1 AND otp = $2 AND verification_type = $3",
+      [whatsapp, otp, 'whatsapp']
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({ message: "Invalid OTP" });
+    }
+
+    const record = result.rows[0];
+    if (new Date() > new Date(record.expires_at)) {
+      return res.status(400).json({ message: "OTP has expired" });
+    }
+
+    // Mark as verified
+    await db.query(
+      "UPDATE signup_verification_otp SET is_verified = TRUE WHERE whatsapp = $1 AND verification_type = $2",
+      [whatsapp, 'whatsapp']
+    );
+
+    res.json({ message: "WhatsApp verified successfully" });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Verification failed" });
+  }
+});
+
 // Teammate's Secure Signup Route
 app.post("/signup", async (req, res) => {
   try {
@@ -80,21 +246,23 @@ app.post("/signup", async (req, res) => {
     let sex = req.body.sex;
     let food = req.body.food;
     let state = req.body.state;
-    if (
-      !name ||
-      !email ||
-      !password ||
-      !dob ||
-      !whatsapp ||
-      !sex ||
-      !food ||
-      !state
-    ) {
-      return res.status(400).json({
-        message:
-          "All fields (Name, Email, Password, DOB, WhatsApp, Sex, Diet, State) are mandatory.",
-      });
+
+    // Verify email has been verified via OTP
+    const emailVerified = await db.query(
+      "SELECT * FROM password_reset_otp WHERE email = $1 AND is_verified = TRUE",
+      [email]
+    );
+
+    if (emailVerified.rows.length === 0) {
+      return res.status(400).json({ message: "Email not verified" });
     }
+
+    // Verify WhatsApp has been verified via OTP
+    global.whatsappOtps = global.whatsappOtps || {};
+    if (!global.whatsappOtps[whatsapp] || !global.whatsappOtps[whatsapp].verified) {
+      return res.status(400).json({ message: "WhatsApp not verified" });
+    }
+
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({ message: "Invalid email format" });
@@ -137,6 +305,10 @@ app.post("/signup", async (req, res) => {
           );
 
           const user = insertResult.rows[0];
+
+          // Clean up OTP records after successful signup
+          await db.query("DELETE FROM password_reset_otp WHERE email = $1", [email]);
+          delete global.whatsappOtps[whatsapp];
 
           req.login(user, (err) => {
             if (err) {
@@ -1262,6 +1434,12 @@ app.post("/forgot-password/send-otp", async (req, res) => {
       return res.status(400).json({ message: "Email is required" });
     }
 
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: "Invalid email format" });
+    }
+
     // Security: Check if user exists (silently - don't reveal)
     const userResult = await db.query("SELECT id FROM users WHERE email = $1", [
       email,
@@ -1278,16 +1456,16 @@ app.post("/forgot-password/send-otp", async (req, res) => {
     }
 
     // Email exists - proceed with OTP
-    // Generate OTP
+    const userId = userResult.rows[0].id;
     const otp = generateOTP();
 
     // Delete old OTP if exists
-    await db.query("DELETE FROM password_reset_otp WHERE email = $1", [email]);
+    await db.query("DELETE FROM password_reset_otp WHERE user_id = $1", [userId]);
 
-    // Store OTP in database
+    // Store OTP in database with user_id
     await db.query(
-      "INSERT INTO password_reset_otp (email, otp, expires_at) VALUES ($1, $2, NOW() + INTERVAL '10 minutes')",
-      [email, otp],
+      "INSERT INTO password_reset_otp (user_id, otp, expires_at) VALUES ($1, $2, NOW() + INTERVAL '10 minutes')",
+      [userId, otp],
     );
 
     // Send OTP via email
@@ -1331,10 +1509,17 @@ app.post("/forgot-password/verify-otp", async (req, res) => {
       return res.status(400).json({ message: "Email and OTP are required" });
     }
 
+    // Get user_id from email
+    const userResult = await db.query("SELECT id FROM users WHERE email = $1", [email]);
+    if (userResult.rows.length === 0) {
+      return res.status(400).json({ message: "User not found" });
+    }
+    const userId = userResult.rows[0].id;
+
     // Check if OTP exists and is not expired
     const otpResult = await db.query(
-      "SELECT * FROM password_reset_otp WHERE email = $1 AND otp = $2 AND expires_at > NOW()",
-      [email, otp],
+      "SELECT * FROM password_reset_otp WHERE user_id = $1 AND otp = $2 AND expires_at > NOW()",
+      [userId, otp],
     );
 
     if (otpResult.rows.length === 0) {
@@ -1343,8 +1528,8 @@ app.post("/forgot-password/verify-otp", async (req, res) => {
 
     // Mark OTP as verified
     await db.query(
-      "UPDATE password_reset_otp SET is_verified = TRUE WHERE email = $1 AND otp = $2",
-      [email, otp],
+      "UPDATE password_reset_otp SET is_verified = TRUE WHERE user_id = $1 AND otp = $2",
+      [userId, otp],
     );
 
     res.json({ message: "OTP verified successfully" });
@@ -1365,25 +1550,26 @@ app.post("/forgot-password/reset-password", async (req, res) => {
         .json({ message: "Email and password are required" });
     }
 
+    // Check if user exists
+    const userResult = await db.query("SELECT id FROM users WHERE email = $1", [
+      email,
+    ]);
+
+    if (userResult.rows.length === 0) {
+      return res.status(400).json({ message: "User not found" });
+    }
+    const userId = userResult.rows[0].id;
+
     // Check if OTP was verified
     const otpResult = await db.query(
-      "SELECT * FROM password_reset_otp WHERE email = $1 AND is_verified = TRUE AND expires_at > NOW()",
-      [email],
+      "SELECT * FROM password_reset_otp WHERE user_id = $1 AND is_verified = TRUE AND expires_at > NOW()",
+      [userId],
     );
 
     if (otpResult.rows.length === 0) {
       return res.status(400).json({
         message: "OTP not verified or expired. Please request a new OTP.",
       });
-    }
-
-    // Check if user exists
-    const userResult = await db.query("SELECT * FROM users WHERE email = $1", [
-      email,
-    ]);
-
-    if (userResult.rows.length === 0) {
-      return res.status(400).json({ message: "User not found" });
     }
 
     // Hash new password
@@ -1401,8 +1587,8 @@ app.post("/forgot-password/reset-password", async (req, res) => {
         ]);
 
         // Delete used OTP
-        await db.query("DELETE FROM password_reset_otp WHERE email = $1", [
-          email,
+        await db.query("DELETE FROM password_reset_otp WHERE user_id = $1", [
+          userId,
         ]);
 
         // Send confirmation email
