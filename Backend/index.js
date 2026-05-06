@@ -41,7 +41,7 @@ app.use(
     saveUninitialized: false,
     cookie: {
       maxAge: 1000 * 60 * 60 * 24,
-      sameSite: "none",
+      sameSite: "lax",
       secure: false,
     },
   }),
@@ -169,7 +169,7 @@ app.post("/login", passport.authenticate("local"), (req, res) => {
       console.error("Session save error:", err);
       return res.status(500).json({ message: "Session error" });
     }
-    res.json({ message: "Login successful", user: req.user });
+    res.json({ message: "Login successful", user });
   });
 });
 
