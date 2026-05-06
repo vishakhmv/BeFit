@@ -249,8 +249,8 @@ app.post("/signup", async (req, res) => {
 
     // Verify email has been verified via OTP
     const emailVerified = await db.query(
-      "SELECT * FROM password_reset_otp WHERE email = $1 AND is_verified = TRUE",
-      [email]
+      "SELECT * FROM signup_verification_otp WHERE email = $1 AND verification_type = $2 AND is_verified = TRUE",
+      [email, 'email']
     );
 
     if (emailVerified.rows.length === 0) {
@@ -258,8 +258,12 @@ app.post("/signup", async (req, res) => {
     }
 
     // Verify WhatsApp has been verified via OTP
-    global.whatsappOtps = global.whatsappOtps || {};
-    if (!global.whatsappOtps[whatsapp] || !global.whatsappOtps[whatsapp].verified) {
+    const whatsappVerified = await db.query(
+      "SELECT * FROM signup_verification_otp WHERE whatsapp = $1 AND verification_type = $2 AND is_verified = TRUE",
+      [whatsapp, 'whatsapp']
+    );
+
+    if (whatsappVerified.rows.length === 0) {
       return res.status(400).json({ message: "WhatsApp not verified" });
     }
 
@@ -307,8 +311,8 @@ app.post("/signup", async (req, res) => {
           const user = insertResult.rows[0];
 
           // Clean up OTP records after successful signup
-          await db.query("DELETE FROM password_reset_otp WHERE email = $1", [email]);
-          delete global.whatsappOtps[whatsapp];
+          await db.query("DELETE FROM signup_verification_otp WHERE email = $1", [email]);
+          await db.query("DELETE FROM signup_verification_otp WHERE whatsapp = $1 AND verification_type = $2", [whatsapp, 'whatsapp']);
 
           req.login(user, (err) => {
             if (err) {
@@ -1410,15 +1414,6 @@ cron.schedule(
   },
   { scheduled: true, timezone: "Asia/Kolkata" },
 );
-
-// Configure Email Service (Gmail)
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD,
-  },
-});
 
 // Generate OTP
 function generateOTP() {
