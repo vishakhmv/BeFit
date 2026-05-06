@@ -163,14 +163,7 @@ app.post("/signup", async (req, res) => {
   }
 });
 app.post("/login", passport.authenticate("local"), (req, res) => {
-  // Force the session to save before telling React to navigate
-  req.session.save((err) => {
-    if (err) {
-      console.error("Session save error:", err);
-      return res.status(500).json({ message: "Session error" });
-    }
-    res.json({ message: "Login successful", user });
-  });
+  res.json({ message: "Login successful", user: req.user });
 });
 
 passport.use(
