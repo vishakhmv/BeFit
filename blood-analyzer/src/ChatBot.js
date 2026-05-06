@@ -4,7 +4,7 @@ import "./ChatBot.css";
 
 const API_KEY = process.env.REACT_APP_GEMINI_API_KEY;
 
-export default function ChatBot({ isOpen, onClose, reportData }) {
+export default function ChatBot({ isOpen, onClose, analysisData }) {
   const [messages, setMessages] = useState([
     {
       role: "bot",
@@ -49,8 +49,8 @@ export default function ChatBot({ isOpen, onClose, reportData }) {
       let systemInstruction =
         "You are BeFit Assistant, a friendly and knowledgeable health and fitness AI. You help users understand their blood reports, suggest workout plans, provide nutrition advice, and answer general health questions. Keep responses concise, helpful, and easy to understand. Always remind users to consult healthcare professionals for serious medical concerns.";
 
-      if (reportData?.results?.length) {
-        const reportSummary = reportData.results
+      if (analysisData?.results?.length) {
+        const reportSummary = analysisData.results
           .map((r) => `${r.name}: ${r.value} (${r.status})`)
           .join(", ");
 

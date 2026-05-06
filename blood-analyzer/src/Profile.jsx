@@ -182,7 +182,7 @@ export default function Profile({ isOpen, onClose }) {
 
   const handleLogout = async () => {
     await fetch("http://localhost:5000/logout", { method: "POST", credentials: "include" });
-    navigate("/login");
+    navigate("/");
   };
 
   const flash = (msg) => {

@@ -41,6 +41,8 @@ app.use(
     saveUninitialized: false,
     cookie: {
       maxAge: 1000 * 60 * 60 * 24,
+      sameSite: "lax",
+      secure: false,
     },
   }),
 );
@@ -78,6 +80,21 @@ app.post("/signup", async (req, res) => {
     let sex = req.body.sex;
     let food = req.body.food;
     let state = req.body.state;
+    if (
+      !name ||
+      !email ||
+      !password ||
+      !dob ||
+      !whatsapp ||
+      !sex ||
+      !food ||
+      !state
+    ) {
+      return res.status(400).json({
+        message:
+          "All fields (Name, Email, Password, DOB, WhatsApp, Sex, Diet, State) are mandatory.",
+      });
+    }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({ message: "Invalid email format" });
@@ -126,7 +143,13 @@ app.post("/signup", async (req, res) => {
               console.log(err);
               res.status(500).json({ message: "Login" });
             } else {
-              res.json({ message: "Signup successful", user });
+              req.session.save((err) => {
+                if (err) {
+                  console.log("Session save error:", err);
+                  return res.status(500).json({ message: "Session error" });
+                }
+                res.json({ message: "Signup successful", user });
+              });
             }
           });
         }
@@ -245,11 +268,12 @@ User Details Provided:
 * Dietary Preference (Veg/Non-Veg)
 
 IMPORTANT RULES:
-1. Use the user details to personalize recommendations.
-2. Do NOT repeat the user's personal details in the output.
-3. Do NOT diagnose diseases.
-4. If any parameter is LOW or HIGH, clearly state that the user should consult a doctor.
-5. Keep the analysis simple and easy to understand.
+1. VALIDATION: First, verify that the uploaded image or document is actually a medical blood test report. If it is NOT a blood test report (e.g., a random photo, a selfie, a receipt, or an unrelated document), you MUST immediately return the ERROR RESPONSE and stop processing.
+2. Use the user details to personalize recommendations.
+3. Do NOT repeat the user's personal details in the output.
+4. Do NOT diagnose diseases.
+5. If any parameter is LOW or HIGH, clearly state that the user should consult a doctor.
+6. Keep the analysis simple and easy to understand.
 
 ANTI-HALLUCINATION & EVALUATION RULES:
 1. Extract ONLY visible parameters.
@@ -410,6 +434,7 @@ const getAnalysisFromDB = async (userId) => {
     results: resultsRes.rows.map((r) => ({
       extractedName: r.extracted_name,
       expandedName: r.expanded_name,
+      name: r.expanded_name || r.extracted_name || "Unknown Parameter",
       value: r.test_value,
       status: r.status,
       issues: r.issues,
@@ -443,6 +468,14 @@ app.post(
   async (req, res) => {
     let imagePath;
     try {
+      if (!req.body.height || !req.body.weight) {
+        if (req.file && req.file.path) {
+          if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+        }
+        return res
+          .status(400)
+          .json({ message: "Height and weight are mandatory fields." });
+      }
       if (!req.file)
         return res.status(400).json({ message: "No file uploaded." });
 
@@ -482,12 +515,9 @@ food: ${dbUser.food}
       } catch (parseError) {
         console.error("Failed to parse Gemini output:");
         if (imagePath && fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
-        return res
-          .status(500)
-          .json({
-            message:
-              "AI generated an invalid response format. Please try again.",
-          });
+        return res.status(500).json({
+          message: "AI generated an invalid response format. Please try again.",
+        });
       }
 
       if (parsed.error) {
@@ -690,7 +720,7 @@ app.get("/get-analysis", async (req, res) => {
   }
 });
 app.post("/save-tracker", async (req, res) => {
-  console.log("Someone knocked on the /save-tracker door!");
+  console.log("clicked /save-tracker");
 
   try {
     if (!req.isAuthenticated()) {
@@ -1209,7 +1239,6 @@ cron.schedule(
   { scheduled: true, timezone: "Asia/Kolkata" },
 );
 
-
 // Configure Email Service (Gmail)
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -1407,11 +1436,12 @@ app.post("/forgot-password/reset-password", async (req, res) => {
 });
 // GET completions for a user
 app.get("/get-completions", async (req, res) => {
-  if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+  if (!req.isAuthenticated())
+    return res.status(401).json({ message: "Unauthorized" });
   try {
     const result = await db.query(
       "SELECT task_id, day FROM task_completions WHERE user_id=$1",
-      [req.user.id]
+      [req.user.id],
     );
     res.json({ completions: result.rows });
   } catch (err) {
@@ -1421,7 +1451,8 @@ app.get("/get-completions", async (req, res) => {
 });
 
 app.post("/toggle-task", async (req, res) => {
-  if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+  if (!req.isAuthenticated())
+    return res.status(401).json({ message: "Unauthorized" });
   try {
     const { taskId, completed } = req.body;
     const userId = req.user.id;
@@ -1430,13 +1461,13 @@ app.post("/toggle-task", async (req, res) => {
       const id = taskId.replace("diet-", "");
       await db.query(
         "UPDATE diet SET completed=$1 WHERE id=$2 AND user_id=$3",
-        [completed, id, userId]
+        [completed, id, userId],
       );
     } else if (taskId.startsWith("ex-")) {
       const id = taskId.replace("ex-", "");
       await db.query(
         "UPDATE exercise SET completed=$1 WHERE id=$2 AND user_id=$3",
-        [completed, id, userId]
+        [completed, id, userId],
       );
     }
 
@@ -1449,19 +1480,20 @@ app.post("/toggle-task", async (req, res) => {
 
 // TOGGLE a completion
 app.post("/toggle-completion", async (req, res) => {
-  if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+  if (!req.isAuthenticated())
+    return res.status(401).json({ message: "Unauthorized" });
   try {
     const { taskId, day, completed } = req.body;
     const userId = req.user.id;
     if (completed) {
       await db.query(
         "INSERT INTO task_completions (user_id, task_id, day) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING",
-        [userId, taskId, day]
+        [userId, taskId, day],
       );
     } else {
       await db.query(
         "DELETE FROM task_completions WHERE user_id=$1 AND task_id=$2 AND day=$3",
-        [userId, taskId, day]
+        [userId, taskId, day],
       );
     }
     res.json({ ok: true });
