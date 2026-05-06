@@ -80,6 +80,21 @@ app.post("/signup", async (req, res) => {
     let sex = req.body.sex;
     let food = req.body.food;
     let state = req.body.state;
+    if (
+      !name ||
+      !email ||
+      !password ||
+      !dob ||
+      !whatsapp ||
+      !sex ||
+      !food ||
+      !state
+    ) {
+      return res.status(400).json({
+        message:
+          "All fields (Name, Email, Password, DOB, WhatsApp, Sex, Diet, State) are mandatory.",
+      });
+    }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({ message: "Invalid email format" });
@@ -451,6 +466,14 @@ app.post(
   async (req, res) => {
     let imagePath;
     try {
+      if (!req.body.height || !req.body.weight) {
+        if (req.file && req.file.path) {
+          if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+        }
+        return res
+          .status(400)
+          .json({ message: "Height and weight are mandatory fields." });
+      }
       if (!req.file)
         return res.status(400).json({ message: "No file uploaded." });
 
