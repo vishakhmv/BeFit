@@ -41,6 +41,8 @@ app.use(
     saveUninitialized: false,
     cookie: {
       maxAge: 1000 * 60 * 60 * 24,
+      sameSite: "lax",
+      secure: false,
     },
   }),
 );
@@ -126,7 +128,13 @@ app.post("/signup", async (req, res) => {
               console.log(err);
               res.status(500).json({ message: "Login" });
             } else {
-              res.json({ message: "Signup successful", user });
+              req.session.save((err) => {
+                if (err) {
+                  console.log("Session save error:", err);
+                  return res.status(500).json({ message: "Session error" });
+                }
+                res.json({ message: "Signup successful", user });
+              });
             }
           });
         }
@@ -482,12 +490,9 @@ food: ${dbUser.food}
       } catch (parseError) {
         console.error("Failed to parse Gemini output:");
         if (imagePath && fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
-        return res
-          .status(500)
-          .json({
-            message:
-              "AI generated an invalid response format. Please try again.",
-          });
+        return res.status(500).json({
+          message: "AI generated an invalid response format. Please try again.",
+        });
       }
 
       if (parsed.error) {
@@ -688,7 +693,7 @@ app.get("/get-analysis", async (req, res) => {
   }
 });
 app.post("/save-tracker", async (req, res) => {
-  console.log("Someone knocked on the /save-tracker door!");
+  console.log("clicked /save-tracker");
 
   try {
     if (!req.isAuthenticated()) {
@@ -1207,7 +1212,6 @@ cron.schedule(
   { scheduled: true, timezone: "Asia/Kolkata" },
 );
 
-
 // Configure Email Service (Gmail)
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -1405,11 +1409,12 @@ app.post("/forgot-password/reset-password", async (req, res) => {
 });
 // GET completions for a user
 app.get("/get-completions", async (req, res) => {
-  if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+  if (!req.isAuthenticated())
+    return res.status(401).json({ message: "Unauthorized" });
   try {
     const result = await db.query(
       "SELECT task_id, day FROM task_completions WHERE user_id=$1",
-      [req.user.id]
+      [req.user.id],
     );
     res.json({ completions: result.rows });
   } catch (err) {
@@ -1419,7 +1424,8 @@ app.get("/get-completions", async (req, res) => {
 });
 
 app.post("/toggle-task", async (req, res) => {
-  if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+  if (!req.isAuthenticated())
+    return res.status(401).json({ message: "Unauthorized" });
   try {
     const { taskId, completed } = req.body;
     const userId = req.user.id;
@@ -1428,13 +1434,13 @@ app.post("/toggle-task", async (req, res) => {
       const id = taskId.replace("diet-", "");
       await db.query(
         "UPDATE diet SET completed=$1 WHERE id=$2 AND user_id=$3",
-        [completed, id, userId]
+        [completed, id, userId],
       );
     } else if (taskId.startsWith("ex-")) {
       const id = taskId.replace("ex-", "");
       await db.query(
         "UPDATE exercise SET completed=$1 WHERE id=$2 AND user_id=$3",
-        [completed, id, userId]
+        [completed, id, userId],
       );
     }
 
@@ -1447,19 +1453,20 @@ app.post("/toggle-task", async (req, res) => {
 
 // TOGGLE a completion
 app.post("/toggle-completion", async (req, res) => {
-  if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+  if (!req.isAuthenticated())
+    return res.status(401).json({ message: "Unauthorized" });
   try {
     const { taskId, day, completed } = req.body;
     const userId = req.user.id;
     if (completed) {
       await db.query(
         "INSERT INTO task_completions (user_id, task_id, day) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING",
-        [userId, taskId, day]
+        [userId, taskId, day],
       );
     } else {
       await db.query(
         "DELETE FROM task_completions WHERE user_id=$1 AND task_id=$2 AND day=$3",
-        [userId, taskId, day]
+        [userId, taskId, day],
       );
     }
     res.json({ ok: true });
@@ -1477,12 +1484,12 @@ app.get("/profile", async (req, res) => {
   try {
     const result = await db.query(
       "SELECT name, food, cstate, sex FROM users WHERE id = $1",
-      [req.user.id]
+      [req.user.id],
     );
     if (result.rows.length === 0)
       return res.status(404).json({ message: "User not found" });
 
-    const { name, food, cstate, sex } = result.rows[0];  // ← sex must be here
+    const { name, food, cstate, sex } = result.rows[0]; // ← sex must be here
 
     res.json({
       name: name || "",
@@ -1528,7 +1535,7 @@ app.post("/profile/update", async (req, res) => {
     values.push(userId);
     await db.query(
       `UPDATE users SET ${fields.join(", ")} WHERE id = $${i}`,
-      values
+      values,
     );
 
     // Re-fetch the updated row and write it back into the Passport session
