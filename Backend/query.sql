@@ -32,13 +32,15 @@ CREATE TABLE exercise (
 CREATE TABLE sleep (
     id SERIAL PRIMARY KEY,
     user_id INT REFERENCES users(id),
-    sleep_hour VARCHAR(20)
+    sleep_hour VARCHAR(20),
+    completed BOOLEAN DEFAULT FALSE
 );
  
 CREATE TABLE water (
     id SERIAL PRIMARY KEY,
     user_id INT REFERENCES users(id),
-    water VARCHAR(20)
+    water VARCHAR(20),
+    completed BOOLEAN DEFAULT FALSE
 );
 
 CREATE TABLE executive_summary (

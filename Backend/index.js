@@ -556,7 +556,8 @@ food: ${dbUser.food}
       // 2. INSERT EXECUTIVE SUMMARY
       const es = parsed.executiveSummary;
       await db.query(
-        `INSERT INTO executive_summary (user_id, future_outlook, key_focus_areas, dietary_focus, estimated_calories, estimated_protein, lifestyle_advice) 
+        `INSERT INTO executive_summary (user_id, future_outlook, key_focus_areas, dietary_focus,
+         estimated_calories, estimated_protein, lifestyle_advice) 
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [
           userId,
@@ -572,7 +573,8 @@ food: ${dbUser.food}
       // 3. INSERT BLOOD RESULTS
       for (const resItem of parsed.results) {
         await db.query(
-          `INSERT INTO blood_results (user_id, extracted_name, expanded_name, test_value, status, issues, why_it_happens, summary, what_if_low, what_if_high) 
+          `INSERT INTO blood_results (user_id, extracted_name, expanded_name, test_value, status, issues, 
+          why_it_happens, summary, what_if_low, what_if_high) 
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
           [
             userId,
@@ -1469,26 +1471,28 @@ app.post("/toggle-completion", async (req, res) => {
   }
 });
 
-// GET /profile — always read fresh from DB, never trust req.user cache
+// GET /profile — fetch all fields including email, phone, dob
 app.get("/profile", async (req, res) => {
   if (!req.isAuthenticated())
     return res.status(401).json({ message: "Unauthorized" });
 
   try {
     const result = await db.query(
-      "SELECT name, food, cstate, sex FROM users WHERE id = $1",
+      "SELECT name, email, whatsapp_number, dob, sex, food, cstate FROM users WHERE id = $1",
       [req.user.id]
     );
     if (result.rows.length === 0)
       return res.status(404).json({ message: "User not found" });
 
-    const { name, food, cstate, sex } = result.rows[0];  // ← sex must be here
-
+    const { name, email, whatsapp_number, dob, sex, food, cstate } = result.rows[0];
     res.json({
       name: name || "",
+      email: email || "",
+      phone: whatsapp_number || "",
+      dob: dob ? dob.toISOString().split("T")[0] : "",
+      gender: sex || null,
       diet_preference: food || null,
       state: cstate || "",
-      sex: sex || null,
     });
   } catch (err) {
     console.error(err);
@@ -1496,43 +1500,33 @@ app.get("/profile", async (req, res) => {
   }
 });
 
-// POST /profile/update — update DB then re-sync the Passport session
+// POST  handles all 7 editable fields
 app.post("/profile/update", async (req, res) => {
   if (!req.isAuthenticated())
     return res.status(401).json({ message: "Unauthorized" });
 
   const userId = req.user.id;
-  const { name, diet_preference, state } = req.body;
+  const { name, email, phone, dob, sex, food, cstate } = req.body;
 
   const fields = [];
   const values = [];
   let i = 1;
 
-  if (name !== undefined && name.trim() !== "") {
-    fields.push(`name = $${i++}`);
-    values.push(name.trim());
-  }
-  if (diet_preference !== undefined) {
-    fields.push(`food = $${i++}`);
-    values.push(diet_preference);
-  }
-  if (state !== undefined) {
-    fields.push(`cstate = $${i++}`);
-    values.push(state);
-  }
+  if (name  !== undefined && name.trim()  !== "") { fields.push(`name = $${i++}`);             values.push(name.trim()); }
+  if (email !== undefined && email.trim() !== "") { fields.push(`email = $${i++}`);            values.push(email.trim()); }
+  if (phone !== undefined && phone.trim() !== "") { fields.push(`whatsapp_number = $${i++}`);  values.push(phone.trim()); }
+  if (dob   !== undefined && dob.trim()   !== "") { fields.push(`dob = $${i++}`);              values.push(dob.trim()); }
+  if (sex   !== undefined)                        { fields.push(`sex = $${i++}`);              values.push(sex); }
+  if (food  !== undefined)                        { fields.push(`food = $${i++}`);             values.push(food); }
+  if (cstate !== undefined)                       { fields.push(`cstate = $${i++}`);           values.push(cstate); }
 
   if (fields.length === 0)
     return res.status(400).json({ message: "No fields to update" });
 
   try {
     values.push(userId);
-    await db.query(
-      `UPDATE users SET ${fields.join(", ")} WHERE id = $${i}`,
-      values
-    );
+    await db.query(`UPDATE users SET ${fields.join(", ")} WHERE id = $${i}`, values);
 
-    // Re-fetch the updated row and write it back into the Passport session
-    // so req.user stays consistent for the rest of the session
     const fresh = await db.query("SELECT * FROM users WHERE id = $1", [userId]);
     await new Promise((resolve, reject) => {
       req.login(fresh.rows[0], (err) => (err ? reject(err) : resolve()));
@@ -1544,6 +1538,35 @@ app.post("/profile/update", async (req, res) => {
     res.status(500).json({ message: "Failed to update profile" });
   }
 });
+
+app.post("/toggle-water-sleep", async (req, res) => {
+  if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+  try {
+    const { type, id, completed } = req.body;
+    const userId = req.user.id;
+
+    if (type === "water") {
+      await db.query(
+        "UPDATE water SET completed=$1 WHERE id=$2 AND user_id=$3",
+        [completed, id, userId]
+      );
+    } else if (type === "sleep") {
+      await db.query(
+        "UPDATE sleep SET completed=$1 WHERE id=$2 AND user_id=$3",
+        [completed, id, userId]
+      );
+    } else {
+      return res.status(400).json({ message: "Invalid type" });
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to toggle water/sleep" });
+  }
+});
+
+
 
 app.listen(port, () => {
   console.log(`Your app is listening to port ${port}`);

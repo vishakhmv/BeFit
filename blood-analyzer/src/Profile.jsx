@@ -12,59 +12,72 @@ const INDIAN_STATES = [
   "Ladakh", "Lakshadweep", "Puducherry"
 ];
 
+const getYesterdayString = () => {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
 export default function Profile({ isOpen, onClose }) {
   const navigate = useNavigate();
+
   const [name, setName] = useState("User");
   const [nameInput, setNameInput] = useState("");
   const [editingName, setEditingName] = useState(false);
 
   const [email, setEmail] = useState("");
-  const [emailInput, setEmailInput] = useState("");
-  const [editingEmail, setEditingEmail] = useState(false);
 
   const [phone, setPhone] = useState("");
   const [phoneInput, setPhoneInput] = useState("");
   const [editingPhone, setEditingPhone] = useState(false);
+  const [phoneError, setPhoneError] = useState("");
 
   const [dob, setDob] = useState("");
   const [dobInput, setDobInput] = useState("");
   const [editingDob, setEditingDob] = useState(false);
+  const [dobError, setDobError] = useState("");
 
   const [gender, setGender] = useState(null);
   const [diet, setDiet] = useState(null);
   const [state, setState] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
+  const [saveError, setSaveError] = useState("");
 
-  const nameRef = useRef(null);
-  const emailRef = useRef(null);
+  const nameRef  = useRef(null);
   const phoneRef = useRef(null);
-  const dobRef = useRef(null);
+  const dobRef   = useRef(null);
 
   useEffect(() => {
     if (isOpen) {
       fetch("http://localhost:5000/profile", { credentials: "include" })
         .then((r) => r.json())
         .then((d) => {
-          if (d.name) setName(d.name);
-          if (d.email) setEmail(d.email);
-          if (d.phone) setPhone(d.phone);
-          if (d.dob) setDob(d.dob);
-          if (d.gender) setGender(d.gender);
+          if (d.name)            setName(d.name);
+          if (d.email)           setEmail(d.email);
+          if (d.phone) {
+            const digits = d.phone.replace(/^\+91/, "").replace(/\D/g, "");
+            setPhone(digits);
+          }
+          if (d.dob)             setDob(d.dob);
+          if (d.gender)          setGender(d.gender);
           if (d.diet_preference) setDiet(d.diet_preference);
-          if (d.state) setState(d.state);
+          if (d.state)           setState(d.state);
         })
         .catch(() => {});
     }
   }, [isOpen]);
 
-  useEffect(() => { if (editingName && nameRef.current) nameRef.current.focus(); }, [editingName]);
-  useEffect(() => { if (editingEmail && emailRef.current) emailRef.current.focus(); }, [editingEmail]);
+  useEffect(() => { if (editingName  && nameRef.current)  nameRef.current.focus();  }, [editingName]);
   useEffect(() => { if (editingPhone && phoneRef.current) phoneRef.current.focus(); }, [editingPhone]);
-  useEffect(() => { if (editingDob && dobRef.current) dobRef.current.focus(); }, [editingDob]);
+  useEffect(() => { if (editingDob   && dobRef.current)   dobRef.current.focus();   }, [editingDob]);
 
   const saveField = async (payload, successMsg) => {
     setSaving(true);
+    setSaveError("");
     try {
       const res = await fetch("http://localhost:5000/profile/update", {
         method: "POST",
@@ -72,8 +85,15 @@ export default function Profile({ isOpen, onClose }) {
         credentials: "include",
         body: JSON.stringify(payload),
       });
-      if (res.ok) flash(successMsg);
-    } catch {}
+      if (res.ok) {
+        flash(successMsg);
+      } else {
+        const data = await res.json();
+        setSaveError(data.message || "Save failed. Please try again.");
+      }
+    } catch {
+      setSaveError("Network error. Please try again.");
+    }
     setSaving(false);
   };
 
@@ -84,40 +104,80 @@ export default function Profile({ isOpen, onClose }) {
     setEditingName(false);
   };
 
-  const handleEmailSave = async () => {
-    if (!emailInput.trim()) { setEditingEmail(false); return; }
-    await saveField({ email: emailInput.trim() }, "Email updated!");
-    setEmail(emailInput.trim());
-    setEditingEmail(false);
+  const handlePhoneChange = (val) => {
+    const digits = val.replace(/\D/g, "").slice(0, 10);
+    setPhoneInput(digits);
+    if (digits.length > 0 && digits.length < 10) {
+      setPhoneError("WhatsApp number must be exactly 10 digits.");
+    } else {
+      setPhoneError("");
+    }
   };
 
   const handlePhoneSave = async () => {
     if (!phoneInput.trim()) { setEditingPhone(false); return; }
-    await saveField({ phone: phoneInput.trim() }, "Phone number updated!");
-    setPhone(phoneInput.trim());
+    const digits = phoneInput.replace(/\D/g, "");
+    if (digits.length !== 10) {
+      setPhoneError("WhatsApp number must be exactly 10 digits.");
+      return;
+    }
+    setPhoneError("");
+    await saveField({ phone: "+91" + digits }, "Phone updated!");
+    setPhone(digits);
     setEditingPhone(false);
+  };
+
+  const handlePhoneCancel = () => {
+    setPhoneError("");
+    setEditingPhone(false);
+  };
+
+  const handleDobChange = (val) => {
+    setDobInput(val);
+    if (!val) { setDobError(""); return; }
+    const selected = new Date(val);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (selected >= today) {
+      setDobError("Date of birth cannot be today or a future date.");
+    } else {
+      setDobError("");
+    }
   };
 
   const handleDobSave = async () => {
     if (!dobInput.trim()) { setEditingDob(false); return; }
+    const selected = new Date(dobInput);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (selected >= today) {
+      setDobError("Date of birth cannot be today or a future date.");
+      return;
+    }
+    setDobError("");
     await saveField({ dob: dobInput.trim() }, "Date of birth updated!");
     setDob(dobInput.trim());
     setEditingDob(false);
   };
 
+  const handleDobCancel = () => {
+    setDobError("");
+    setEditingDob(false);
+  };
+
   const handleGenderSave = async (val) => {
     setGender(val);
-    await saveField({ gender: val }, "Gender saved!");
+    await saveField({ sex: val }, "Gender saved!");
   };
 
   const handleDietSave = async (val) => {
     setDiet(val);
-    await saveField({ diet_preference: val }, "Diet preference saved!");
+    await saveField({ food: val }, "Diet preference saved!");
   };
 
   const handleStateSave = async (val) => {
     setState(val);
-    await saveField({ state: val }, "State saved!");
+    await saveField({ cstate: val }, "State saved!");
   };
 
   const handleLogout = async () => {
@@ -127,7 +187,7 @@ export default function Profile({ isOpen, onClose }) {
 
   const flash = (msg) => {
     setSaveMsg(msg);
-    setTimeout(() => setSaveMsg(""), 2000);
+    setTimeout(() => setSaveMsg(""), 2500);
   };
 
   const formatDob = (raw) => {
@@ -161,7 +221,9 @@ export default function Profile({ isOpen, onClose }) {
         </div>
 
         <div className="pf-body">
-          {saveMsg && <div className="pf-toast">{saveMsg}</div>}
+
+          {saveMsg   && <div className="pf-toast pf-toast-success">{saveMsg}</div>}
+          {saveError && <div className="pf-toast pf-toast-error">{saveError}</div>}
 
           <div className="pf-avatar-section">
             <svg viewBox="0 0 80 80" className="pf-avatar-lg-svg">
@@ -195,48 +257,40 @@ export default function Profile({ isOpen, onClose }) {
           </div>
 
           <div className="pf-field">
-            <label className="pf-label">Gmail</label>
-            {editingEmail ? (
-              <div className="pf-edit-row">
-                <input
-                  ref={emailRef}
-                  className="pf-input"
-                  type="email"
-                  value={emailInput}
-                  onChange={(e) => setEmailInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleEmailSave()}
-                  placeholder="you@gmail.com"
-                />
-                <button className="pf-btn-save" onClick={handleEmailSave} disabled={saving}>Save</button>
-                <button className="pf-btn-cancel" onClick={() => setEditingEmail(false)}>✕</button>
-              </div>
-            ) : (
-              <div className="pf-field-row">
-                <span className={`pf-field-value ${!email ? "pf-empty" : ""}`}>{email || "Add email"}</span>
-                <button className="pf-btn-edit" onClick={() => { setEmailInput(email); setEditingEmail(true); }}>Edit</button>
-              </div>
-            )}
+            <label className="pf-label">Email</label>
+            <div className="pf-field-row">
+              <span className={`pf-field-value ${!email ? "pf-empty" : ""}`}>
+                {email || "No email on record"}
+              </span>
+            </div>
           </div>
 
           <div className="pf-field">
-            <label className="pf-label">Phone No.</label>
+            <label className="pf-label">WhatsApp No.</label>
             {editingPhone ? (
-              <div className="pf-edit-row">
-                <input
-                  ref={phoneRef}
-                  className="pf-input"
-                  type="tel"
-                  value={phoneInput}
-                  onChange={(e) => setPhoneInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handlePhoneSave()}
-                  placeholder="+91 XXXXX XXXXX"
-                />
-                <button className="pf-btn-save" onClick={handlePhoneSave} disabled={saving}>Save</button>
-                <button className="pf-btn-cancel" onClick={() => setEditingPhone(false)}>✕</button>
-              </div>
+              <>
+                <div className="pf-edit-row">
+                  <span className="pf-input-prefix">+91</span>
+                  <input
+                    ref={phoneRef}
+                    className={`pf-input ${phoneError ? "pf-input-error" : ""}`}
+                    type="tel"
+                    value={phoneInput}
+                    onChange={(e) => handlePhoneChange(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handlePhoneSave()}
+                    placeholder="10-digit number"
+                    maxLength={10}
+                  />
+                  <button className="pf-btn-save" onClick={handlePhoneSave} disabled={saving || !!phoneError}>Save</button>
+                  <button className="pf-btn-cancel" onClick={handlePhoneCancel}>✕</button>
+                </div>
+                {phoneError && <span className="pf-field-error">{phoneError}</span>}
+              </>
             ) : (
               <div className="pf-field-row">
-                <span className={`pf-field-value ${!phone ? "pf-empty" : ""}`}>{phone || "Add phone number"}</span>
+                <span className={`pf-field-value ${!phone ? "pf-empty" : ""}`}>
+                  {phone ? `+91 ${phone}` : "Add WhatsApp number"}
+                </span>
                 <button className="pf-btn-edit" onClick={() => { setPhoneInput(phone); setEditingPhone(true); }}>Edit</button>
               </div>
             )}
@@ -245,21 +299,27 @@ export default function Profile({ isOpen, onClose }) {
           <div className="pf-field">
             <label className="pf-label">Date of Birth</label>
             {editingDob ? (
-              <div className="pf-edit-row">
-                <input
-                  ref={dobRef}
-                  className="pf-input"
-                  type="date"
-                  value={dobInput}
-                  onChange={(e) => setDobInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleDobSave()}
-                />
-                <button className="pf-btn-save" onClick={handleDobSave} disabled={saving}>Save</button>
-                <button className="pf-btn-cancel" onClick={() => setEditingDob(false)}>✕</button>
-              </div>
+              <>
+                <div className="pf-edit-row">
+                  <input
+                    ref={dobRef}
+                    className={`pf-input ${dobError ? "pf-input-error" : ""}`}
+                    type="date"
+                    value={dobInput}
+                    max={getYesterdayString()}
+                    onChange={(e) => handleDobChange(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleDobSave()}
+                  />
+                  <button className="pf-btn-save" onClick={handleDobSave} disabled={saving || !!dobError}>Save</button>
+                  <button className="pf-btn-cancel" onClick={handleDobCancel}>✕</button>
+                </div>
+                {dobError && <span className="pf-field-error">{dobError}</span>}
+              </>
             ) : (
               <div className="pf-field-row">
-                <span className={`pf-field-value ${!dob ? "pf-empty" : ""}`}>{dob ? formatDob(dob) : "Add date of birth"}</span>
+                <span className={`pf-field-value ${!dob ? "pf-empty" : ""}`}>
+                  {dob ? formatDob(dob) : "Add date of birth"}
+                </span>
                 <button className="pf-btn-edit" onClick={() => { setDobInput(dob); setEditingDob(true); }}>Edit</button>
               </div>
             )}
@@ -285,12 +345,14 @@ export default function Profile({ isOpen, onClose }) {
               <button
                 className={`pf-gender-btn ${gender === "Male" ? "active-male" : ""}`}
                 onClick={() => handleGenderSave("Male")}
+                disabled={saving}
               >
                 ♂ Male
               </button>
               <button
                 className={`pf-gender-btn ${gender === "Female" ? "active-female" : ""}`}
                 onClick={() => handleGenderSave("Female")}
+                disabled={saving}
               >
                 ♀ Female
               </button>
@@ -303,12 +365,14 @@ export default function Profile({ isOpen, onClose }) {
               <button
                 className={`pf-diet-btn ${diet === "Veg" ? "active-veg" : ""}`}
                 onClick={() => handleDietSave("Veg")}
+                disabled={saving}
               >
                 🥦 Veg
               </button>
               <button
                 className={`pf-diet-btn ${diet === "Non-Veg" ? "active-nonveg" : ""}`}
                 onClick={() => handleDietSave("Non-Veg")}
+                disabled={saving}
               >
                 🍗 Non-Veg
               </button>
@@ -318,8 +382,8 @@ export default function Profile({ isOpen, onClose }) {
           <button className="pf-logout-btn" onClick={handleLogout}>
             Logout
           </button>
-        </div>
 
+        </div>
       </div>
     </div>
   );

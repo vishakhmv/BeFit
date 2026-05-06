@@ -20,6 +20,56 @@
   flex-direction: column;
 }
 
+/* Error state input border */
+.pf-input-error {
+  border-color: #e53935 !important;
+}
+
+/* Inline field error message */
+.pf-field-error {
+  font-size: 0.74rem;
+  color: #c62828;
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+/* Success toast (green) */
+.pf-toast-success {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+/* Error toast (red) */
+.pf-toast-error {
+  background: #ffebee;
+  color: #c62828;
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-align: center;
+}
+
+.pf-input-prefix {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #555;
+  white-space: nowrap;
+  padding: 0 4px 0 2px;
+}
+
+/* Lock badge next to email */
+.pf-locked-badge {
+  font-size: 0.72rem;
+  color: #aaa;
+  background: #f5f5f5;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
 .pf-header {
   display: flex;
   align-items: center;
