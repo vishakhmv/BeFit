@@ -68,9 +68,9 @@ CREATE TABLE blood_results (
 
 CREATE TABLE password_reset_otp (
     id SERIAL PRIMARY KEY,
-    email VARCHAR(150) NOT NULL,
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,  
     otp VARCHAR(6) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     expires_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP + INTERVAL '10 minutes',
     is_verified BOOLEAN DEFAULT FALSE
-);
+)
