@@ -434,6 +434,7 @@ const getAnalysisFromDB = async (userId) => {
     results: resultsRes.rows.map((r) => ({
       extractedName: r.extracted_name,
       expandedName: r.expanded_name,
+      name: r.expanded_name || r.extracted_name || "Unknown Parameter",
       value: r.test_value,
       status: r.status,
       issues: r.issues,

@@ -41,7 +41,9 @@
   border-radius: 12px;
   font-size: 1rem;
   outline: none;
-  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  transition:
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
 }
 
 .signup-form input:focus,
@@ -53,7 +55,7 @@
 .signup-form button {
   width: 100%;
   padding: 12px;
-  background: linear-gradient(135deg, #6c4df6, #4824ea);
+  background-color: #2c5f63;
   color: white;
   border: none;
   border-radius: 8px;
@@ -63,7 +65,7 @@
 }
 
 .signup-form button:hover {
-  background: #3c1ec2;
+  background: #1f4245;
   box-shadow: -6px 6px 0 rgba(0, 0, 0, 0.4);
   transform: translate(1px, -1px);
   transition: box-shadow 0.15s ease;

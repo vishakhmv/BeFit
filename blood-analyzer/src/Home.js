@@ -80,7 +80,10 @@ export default function Home() {
 
       if (!data || !Array.isArray(data.results)) {
         console.error("❌ Invalid response from server:", data);
-        alert(data?.message || "Analysis failed. The report could not be read. Please try a clearer image.");
+        alert(
+          data?.message ||
+            "Analysis failed. The report could not be read. Please try a clearer image.",
+        );
         setLoading(false);
         return;
       }
@@ -93,7 +96,7 @@ export default function Home() {
       setLoading(false);
     }
   };
-  
+
   const getBadgeClass = (status) => {
     if (status === "NORMAL") return "badge normal";
     if (status === "LOW") return "badge low";
@@ -189,23 +192,30 @@ export default function Home() {
                         flexWrap: "wrap",
                       }}
                     >
-                     
-  <input
-    style={{ width: "26rem", display: "block", margin: "0 auto 1rem auto" }}
-    placeholder="Height (cm)"
-    value={userData.height}
-    onChange={(e) =>
-      setUserData({ ...userData, height: e.target.value })
-    }
-  />
-  <input
-    style={{ width: "26rem", display: "block", margin: "0 auto 1rem auto" }}
-    placeholder="Weight (kg)"
-    value={userData.weight}
-    onChange={(e) =>
-      setUserData({ ...userData, weight: e.target.value })
-    }
-  />
+                      <input
+                        style={{
+                          width: "26rem",
+                          display: "block",
+                          margin: "0 auto 1rem auto",
+                        }}
+                        placeholder="Height (cm)"
+                        value={userData.height}
+                        onChange={(e) =>
+                          setUserData({ ...userData, height: e.target.value })
+                        }
+                      />
+                      <input
+                        style={{
+                          width: "26rem",
+                          display: "block",
+                          margin: "0 auto 1rem auto",
+                        }}
+                        placeholder="Weight (kg)"
+                        value={userData.weight}
+                        onChange={(e) =>
+                          setUserData({ ...userData, weight: e.target.value })
+                        }
+                      />
                     </div>
 
                     <button
@@ -713,7 +723,7 @@ export default function Home() {
       </div>
 
       <Profile isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} />
-      <ChatBot isOpen={isChatOpen} onClose={toggleChat} />
+      <ChatBot isOpen={isChatOpen} onClose={toggleChat} analysisData={result} />
 
       <div
         className="bot-button"
