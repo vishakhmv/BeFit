@@ -1408,22 +1408,9 @@ cron.schedule(
       console.error("Cron Error:", err);
     }
   },
-  { scheduled: true, timezone: "Asia/Kolkata" },
+  { scheduled: true, timezone: "Asia/Kolkata" }
 );
 
-// Configure Email Service (Gmail)
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD,
-  },
-});
-
-// Generate OTP
-function generateOTP() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-}
 
 // Route 1: Send OTP to Email
 app.post("/forgot-password/send-otp", async (req, res) => {

@@ -111,11 +111,15 @@ export default function TodoTracker() {
     if (!task) return;
     const nowCompleted = !task.completed;
 
+    const isWaterOrSleep = id.startsWith("water-") || id.startsWith("sleep-");
+
     setTasksByDay(prev => {
       const updated = {};
       for (const day of DAYS) {
         updated[day] = (prev[day] || []).map(t =>
-          t.id === id ? { ...t, completed: nowCompleted } : t
+          t.id === id && (!isWaterOrSleep || day === todayName)
+            ? { ...t, completed: nowCompleted }
+            : t
         );
       }
       return updated;
@@ -144,7 +148,9 @@ export default function TodoTracker() {
         const reverted = {};
         for (const day of DAYS) {
           reverted[day] = (prev[day] || []).map(t =>
-            t.id === id ? { ...t, completed: !nowCompleted } : t
+            t.id === id && (!isWaterOrSleep || day === todayName)
+              ? { ...t, completed: !nowCompleted }
+              : t
           );
         }
         return reverted;
